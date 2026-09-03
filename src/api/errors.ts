@@ -97,8 +97,6 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
   // Brands and lists
   'brand id not passed': { code: 'brand_id_missing', exitCode: Exit.USAGE },
   'brand does not exist': { code: 'brand_not_found', exitCode: Exit.API_ERROR },
-  'no lists found': { code: 'no_lists', exitCode: Exit.OK },
-  'no brands found': { code: 'no_brands', exitCode: Exit.OK },
   'list does not exist': {
     code: 'list_not_found',
     exitCode: Exit.API_ERROR,
@@ -123,6 +121,17 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
     exitCode: Exit.API_ERROR,
     hint: 'The From domain must be verified for this brand, or listed in its allowed domains.',
   },
+}
+
+/**
+ * Bodies that mean "nothing to return" rather than a failure. get-lists.php
+ * and get-brands.php answer with prose instead of an empty object when the
+ * brand has no rows, and an empty collection is not an error.
+ */
+const PROSE_EMPTY = new Set(['no lists found', 'no brands found'])
+
+export function isProseEmpty(body: string): boolean {
+  return PROSE_EMPTY.has(body.trim().toLowerCase())
 }
 
 /** Bodies that mean success even though they are bare prose. */

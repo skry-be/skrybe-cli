@@ -1,4 +1,5 @@
 import type { SkrybeClient } from '../client.js'
+import { isProseEmpty } from '../errors.js'
 import { parseNumberedObject, type NamedEntity } from '../parse.js'
 
 export interface List extends NamedEntity {
@@ -21,6 +22,7 @@ export async function listLists(
     path: 'api/lists/get-lists.php',
     body: { include_hidden: opts.includeHidden ? 'yes' : 'no' },
   })
+  if (isProseEmpty(body)) return []
   return parseNumberedObject(body, 'list')
 }
 

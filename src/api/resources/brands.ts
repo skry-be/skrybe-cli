@@ -1,4 +1,5 @@
 import type { SkrybeClient } from '../client.js'
+import { isProseEmpty } from '../errors.js'
 import { parseNumberedObject, type NamedEntity } from '../parse.js'
 
 export interface Brand extends NamedEntity {}
@@ -12,5 +13,6 @@ export interface Brand extends NamedEntity {}
  */
 export async function listBrands(client: SkrybeClient): Promise<Brand[]> {
   const body = await client.requestText({ path: 'api/brands/get-brands.php' })
+  if (isProseEmpty(body)) return []
   return parseNumberedObject(body, 'brand')
 }
