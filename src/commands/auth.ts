@@ -81,31 +81,7 @@ export function authCommand(getGlobals: () => GlobalOptions): Command {
       success(`Saved profile ${bold(profileName)} to ${configPath()}`)
     })
 
-  auth
-    .command('whoami')
-    .description('Show the active profile and the brand its key belongs to')
-    .action(async () => {
-      const globals = getGlobals()
-      const profile = resolveProfile({ profile: globals.profile, url: globals.url })
-      const brands = await listBrands(clientFrom(globals))
-
-      if (globals.json) {
-        printJson({ profile: profile.name, url: profile.url, brands })
-        return
-      }
-
-      info(`${bold('Profile')}  ${profile.name ?? dim('(from environment)')}`)
-      info(`${bold('URL')}      ${profile.url}`)
-      if (brands.length === 0) {
-        info(dim('This key is not associated with any brand.'))
-        return
-      }
-      info('')
-      printTable(brands, [
-        { header: 'BRAND ID', value: (b) => b.id },
-        { header: 'NAME', value: (b) => b.name },
-      ])
-    })
+  auth.addCommand(whoamiCommand(getGlobals))
 
   auth
     .command('list')
@@ -147,4 +123,35 @@ export function authCommand(getGlobals: () => GlobalOptions): Command {
     })
 
   return auth
+}
+
+/**
+ * Built as a factory because a Commander instance cannot be attached to two
+ * parents — `skrybe whoami` and `skrybe auth whoami` each need their own.
+ */
+export function whoamiCommand(getGlobals: () => GlobalOptions): Command {
+  return new Command('whoami')
+    .description('Show the active profile and the brand its key belongs to')
+    .action(async () => {
+      const globals = getGlobals()
+      const profile = resolveProfile({ profile: globals.profile, url: globals.url })
+      const brands = await listBrands(clientFrom(globals))
+
+      if (globals.json) {
+        printJson({ profile: profile.name, url: profile.url, brands })
+        return
+      }
+
+      info(`${bold('Profile')}  ${profile.name ?? dim('(from environment)')}`)
+      info(`${bold('URL')}      ${profile.url}`)
+      if (brands.length === 0) {
+        info(dim('This key is not associated with any brand.'))
+        return
+      }
+      info('')
+      printTable(brands, [
+        { header: 'BRAND ID', value: (b) => b.id },
+        { header: 'NAME', value: (b) => b.name },
+      ])
+    })
 }

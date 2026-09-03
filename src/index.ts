@@ -4,12 +4,12 @@ import { Command } from 'commander'
 import type { Command as CommanderCommand } from 'commander'
 
 import { CliError, Exit } from './api/errors.js'
-import { authCommand } from './commands/auth.js'
+import { authCommand, whoamiCommand } from './commands/auth.js'
 import { brandsCommand } from './commands/brands.js'
 import type { GlobalOptions } from './commands/context.js'
 import { listsCommand } from './commands/lists.js'
 import { statsCommand } from './commands/stats.js'
-import { registerStubs } from './commands/unimplemented.js'
+import { notImplemented, registerStubs } from './commands/unimplemented.js'
 import { bold, dim, red } from './output.js'
 
 function version(): string {
@@ -44,10 +44,16 @@ ${dim('The API key is read from stdin, never from a flag — argv is visible in 
 `,
   )
 
-const campaigns = new Command('campaigns').description('Inspect and send campaigns')
+// Bare `skrybe campaigns` should explain itself like the stubbed sub-verbs do,
+// rather than printing a help page full of unavailable commands.
+const campaigns = new Command('campaigns')
+  .description('Campaigns (not yet available in the API)')
+  .allowExcessArguments(false)
+  .action(() => notImplemented('campaigns', '', 'includes/campaigns/list-campaigns-ajax.php'))
 const lists = listsCommand(getGlobals)
 
 program.addCommand(authCommand(getGlobals))
+program.addCommand(whoamiCommand(getGlobals))
 program.addCommand(brandsCommand(getGlobals))
 program.addCommand(lists)
 program.addCommand(campaigns)

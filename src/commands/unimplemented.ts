@@ -81,6 +81,16 @@ export const STUBS: Stub[] = [
   },
 ]
 
+/** The error a stubbed operation raises, shared by the parent default and the leaf. */
+export function notImplemented(parent: string, name: string, blockedBy: string): never {
+  throw new CliError(
+    'not_implemented',
+    `\`skrybe ${parent}${name ? ` ${name}` : ''}\` is not available yet: the Skrybe HTTP API has no endpoint for it.`,
+    Exit.USAGE,
+    `This operation currently exists only in the web UI (${blockedBy}).\nIt is planned for the api/v1 build-out.`,
+  )
+}
+
 export function registerStubs(parents: Map<string, Command>): void {
   for (const stub of STUBS) {
     const parent = parents.get(stub.parent)
@@ -89,14 +99,7 @@ export function registerStubs(parents: Map<string, Command>): void {
     const command = parent
       .command(stub.args ? `${stub.name} ${stub.args}` : stub.name)
       .description(stub.description)
-      .action(() => {
-        throw new CliError(
-          'not_implemented',
-          `\`skrybe ${stub.parent} ${stub.name}\` is not available yet: the Skrybe HTTP API has no endpoint for it.`,
-          Exit.USAGE,
-          `This operation currently exists only in the web UI (${stub.blockedBy}).\nIt is planned for the api/v1 build-out.`,
-        )
-      })
+      .action(() => notImplemented(stub.parent, stub.name, stub.blockedBy))
 
     for (const alias of stub.aliases ?? []) command.alias(alias)
   }

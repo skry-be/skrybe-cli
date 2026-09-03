@@ -14,22 +14,26 @@ Generate an API key in the Skrybe UI under **Settings**, then:
 skrybe auth login --url https://your-install.example.com
 # API key: (paste it here — it is read from stdin, never from a flag)
 
-skrybe lists list
+skrybe lists
 ```
 
 ## Commands
 
+A bare resource name shows the collection — the common case needs no verb.
+
 | Command | What it does |
 | --- | --- |
+| `skrybe lists` | Subscriber lists for the current brand |
+| `skrybe lists --counts` | ...with active subscriber counts (one request per list) |
+| `skrybe lists count <id>` | Active subscriber count for one list |
+| `skrybe brands` | Brands visible to the current key |
+| `skrybe whoami` | Show the active profile and its brand |
 | `skrybe auth login` | Store an API key for an install |
-| `skrybe auth whoami` | Show the active profile and its brand |
 | `skrybe auth list` | List saved profiles |
 | `skrybe auth logout` | Remove a saved profile |
-| `skrybe brands list` | Brands visible to the current key |
-| `skrybe lists list` | Subscriber lists for the current brand |
-| `skrybe lists list --counts` | ...with active subscriber counts (one request per list) |
-| `skrybe lists count <id>` | Active subscriber count for one list |
 | `skrybe stats emails-sent` | Installation-wide emails-sent counter |
+
+`ls` works as an explicit alias everywhere (`skrybe lists ls`).
 
 Commands the HTTP API cannot serve yet — `campaigns list`, `campaigns send`,
 `lists create` and friends — are registered so they fail with an explanation
@@ -41,7 +45,7 @@ One API key maps to exactly one brand, so a profile per brand is the natural uni
 
 ```bash
 skrybe auth login --url https://app.example.com --profile acme
-skrybe --profile acme lists list
+skrybe --profile acme lists
 ```
 
 Credentials live in `~/.skrybe/config.json` (mode `0600`, in a `0700` directory).
@@ -62,8 +66,11 @@ Env wins so CI needs no config file on disk.
 stderr, so redirection and pipes stay clean:
 
 ```bash
-skrybe lists list --json | jq -r '.[].id'
+skrybe lists --json | jq -r '.[].id'
 ```
+
+An empty collection is a success, not an error: `skrybe lists` exits `0` and
+`--json` emits `[]` when the brand has no lists.
 
 Exit codes:
 
