@@ -87,9 +87,15 @@ Exit codes:
 ```bash
 npm install
 npm run typecheck
+npm test
 npm run build
 node dist/index.js --help
 ```
+
+Tests run on `node:test` and talk to a throwaway HTTP server that answers the
+way the PHP endpoints actually do — a 200 carrying a prose failure, a
+string-concatenated payload with an unescaped name — because a mocked `fetch`
+would assert nothing about the quirks the client exists to absorb.
 
 The client absorbs the legacy API's quirks in `src/api/` so command code never
 sees them — form vs JSON bodies, HTTP 200 on failure, and the unescaped
