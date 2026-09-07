@@ -67,6 +67,17 @@ export class ApiError extends CliError {
   }
 }
 
+/**
+ * Render an unexpected response body for an error message: whitespace collapsed
+ * so a multi-line PHP warning stays on one line, and truncated so a stray HTML
+ * page does not fill the terminal. The untruncated body stays on `ApiError.raw`.
+ */
+export function excerpt(body: string, limit = 200): string {
+  const flat = body.replace(/\s+/g, ' ').trim()
+  if (flat === '') return '(an empty response)'
+  return flat.length > limit ? `${flat.slice(0, limit)}…` : flat
+}
+
 interface ProseRule {
   code: string
   exitCode: ExitCode
@@ -100,17 +111,26 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
   'list does not exist': {
     code: 'list_not_found',
     exitCode: Exit.API_ERROR,
-    hint: 'Run `skrybe lists list` to see the IDs available to this API key.',
+    hint: 'Run `skrybe lists` to see the IDs available to this API key.',
   },
   'invalid list id.': {
     code: 'list_not_found',
     exitCode: Exit.API_ERROR,
-    hint: 'Run `skrybe lists list` to see the IDs available to this API key.',
+    hint: 'Run `skrybe lists` to see the IDs available to this API key.',
+  },
+  // Also what decrypt_int() produces from an id it cannot decrypt, so this is
+  // the answer to a malformed id as much as to a missing one.
+  'list id not passed': {
+    code: 'list_id_invalid',
+    exitCode: Exit.USAGE,
+    hint: 'A list ID is the encrypted value `skrybe lists` prints, not the integer in the UI URL.',
   },
 
   // Subscribers
   'subscriber does not exist': { code: 'subscriber_not_found', exitCode: Exit.API_ERROR },
   'email does not exist in list': { code: 'subscriber_not_found', exitCode: Exit.API_ERROR },
+  'email not passed': { code: 'email_missing', exitCode: Exit.USAGE },
+  'email address not passed': { code: 'email_missing', exitCode: Exit.USAGE },
   'invalid email address.': { code: 'invalid_email', exitCode: Exit.USAGE },
   'bounced email address.': { code: 'bounced_email', exitCode: Exit.API_ERROR },
   'email is suppressed.': { code: 'suppressed_email', exitCode: Exit.API_ERROR },

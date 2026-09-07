@@ -1,7 +1,7 @@
 import { Command } from 'commander'
 
 import { activeSubscriberCount, listLists } from '../api/resources/lists.js'
-import { dim, info, printJson, printTable } from '../output.js'
+import { dim, info, printJson, printTable, warn } from '../output.js'
 import { clientFrom, type GlobalOptions } from './context.js'
 
 interface ListOptions {
@@ -23,10 +23,17 @@ async function showLists(getGlobals: () => GlobalOptions, options: ListOptions):
   }
 
   // There is no bulk count endpoint, so this is one request per list.
-  // A single failing list must not take down the listing — it shows as `-`.
+  // A single failing list must not take down the listing — it shows as `-`,
+  // never as 0, and stderr says how many were lost so an unreadable count is
+  // not mistaken for an empty list.
   const counts = options.counts
     ? await Promise.all(rows.map((row) => activeSubscriberCount(client, row.id).catch(() => null)))
     : null
+
+  const failed = counts?.filter((count) => count === null).length ?? 0
+  if (failed > 0) {
+    warn(`Could not read a count for ${failed} of ${rows.length} lists.`)
+  }
 
   const enriched = rows.map((row, i) => ({
     ...row,

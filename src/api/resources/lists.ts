@@ -1,5 +1,5 @@
 import type { SkrybeClient } from '../client.js'
-import { isProseEmpty } from '../errors.js'
+import { ApiError, Exit, excerpt, isProseEmpty } from '../errors.js'
 import { parseNumberedObject, type NamedEntity } from '../parse.js'
 
 export interface List extends NamedEntity {
@@ -26,7 +26,14 @@ export async function listLists(
   return parseNumberedObject(body, 'list')
 }
 
-/** `api/subscribers/active-subscriber-count.php` returns a bare integer. */
+/**
+ * `api/subscribers/active-subscriber-count.php` returns a bare integer.
+ *
+ * Anything else is a failure, and must not be reported as a count. Falling back
+ * to 0 here would answer "this list has no subscribers" to an error — the one
+ * wrong answer a caller cannot detect, and the one most likely to be piped
+ * straight into a decision about whether to send.
+ */
 export async function activeSubscriberCount(
   client: SkrybeClient,
   listId: string,
@@ -35,6 +42,15 @@ export async function activeSubscriberCount(
     path: 'api/subscribers/active-subscriber-count.php',
     body: { list_id: listId },
   })
-  const count = Number.parseInt(body.trim(), 10)
-  return Number.isNaN(count) ? 0 : count
+
+  const trimmed = body.trim()
+  if (!/^\d+$/.test(trimmed)) {
+    throw new ApiError(
+      'malformed_response',
+      `Expected a subscriber count for list ${listId}, got: ${excerpt(trimmed)}`,
+      Exit.API_ERROR,
+      { raw: body },
+    )
+  }
+  return Number.parseInt(trimmed, 10)
 }
