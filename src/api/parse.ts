@@ -14,6 +14,8 @@
  * That gives us a reliable structural anchor for the fallback parser.
  */
 
+import { ApiError, Exit, excerpt } from './errors.js'
+
 export interface NamedEntity {
   id: string
   name: string
@@ -72,9 +74,14 @@ export function parseNumberedObject(body: string, prefix: 'list' | 'brand'): Nam
   const recovered = extractByStructure(trimmed, prefix)
   if (recovered.length > 0) return recovered
 
-  throw new Error(
-    `Could not parse the ${prefix} payload returned by the API. ` +
-      `Re-run with --json to see the raw response.`,
+  // The body is the whole diagnosis here — it is usually a PHP warning or an
+  // interstitial from something in front of the install — so show it rather
+  // than describing it. `raw` keeps the untruncated version for callers.
+  throw new ApiError(
+    'malformed_response',
+    `Could not parse the ${prefix} payload returned by the API.`,
+    Exit.API_ERROR,
+    { raw: body, hint: `The server sent: ${excerpt(trimmed)}` },
   )
 }
 
