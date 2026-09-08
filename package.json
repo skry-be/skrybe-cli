@@ -8,10 +8,24 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=20.19.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/skry-be/skrybe-dashboard.git",
+    "directory": "cli"
+  },
+  "homepage": "https://github.com/skry-be/skrybe-dashboard/tree/main/cli#readme",
+  "bugs": {
+    "url": "https://github.com/skry-be/skrybe-dashboard/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "scripts": {
     "build": "tsup",
@@ -36,5 +50,6 @@
     "email",
     "cli"
   ],
-  "license": "UNLICENSED"
+  "author": "Skrybe",
+  "license": "MIT"
 }

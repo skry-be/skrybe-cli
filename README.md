@@ -3,12 +3,22 @@
 Command line interface for the Skrybe email marketing API.
 
 ```bash
-npx @skrybe/cli lists list
+npx @skrybe/cli lists
+```
+
+## Install
+
+Requires Node.js 20.19 or newer.
+
+```bash
+npm install -g @skrybe/cli   # then: skrybe lists
+npx @skrybe/cli lists        # or run it without installing
 ```
 
 ## Getting started
 
-Generate an API key in the Skrybe UI under **Settings**, then:
+The API key is the whole credential — there is no separate login. Generate one
+in the Skrybe UI under **Settings**, then:
 
 ```bash
 skrybe auth login --url https://your-install.example.com
