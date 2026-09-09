@@ -60,9 +60,22 @@ jobs:
       # the failure would only surface on a real tag. whoami is the cheapest
       # call that actually authenticates, and it names the account, which
       # catches a token minted from the wrong npm login.
+      # whoami proves who the token is, but not what it may do — a read-only
+      # token passes it. The scope check is what catches the common failure,
+      # because npm answers an unauthorised publish with 404, which reads as
+      # "no such package" and sends you looking in the wrong place entirely.
+      #
+      # A granular token's permissions are fixed when it is created, so a token
+      # minted before its owner joined the org cannot have the scope selected,
+      # and joining later does not widen it. It has to be reissued.
       - name: Verify the npm credential
         run: |
           echo "Publishing as: $(npm whoami)"
+          if npm access list packages @skrybe > /dev/null 2>&1; then
+            echo "Token can see the @skrybe scope."
+          else
+            echo "::warning::This token cannot list @skrybe packages. If the publish fails with E404, that is why: the token needs Read and write on the @skrybe scope, and must have been created after its owner joined the org."
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
