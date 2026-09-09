@@ -24,8 +24,7 @@
     "url": "https://github.com/skry-be/skrybe-dashboard/issues"
   },
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "scripts": {
     "build": "tsup",
