@@ -55,6 +55,17 @@ jobs:
             exit 1
           fi
 
+      # `npm publish --dry-run` never contacts the registry, so without this a
+      # dry run would pass with a missing, expired or wrongly scoped token and
+      # the failure would only surface on a real tag. whoami is the cheapest
+      # call that actually authenticates, and it names the account, which
+      # catches a token minted from the wrong npm login.
+      - name: Verify the npm credential
+        run: |
+          echo "Publishing as: $(npm whoami)"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       # Once 0.1.0 exists on the registry, this token can be replaced with npm
       # trusted publishing: configure the trusted publisher on npmjs.com, drop
       # NODE_AUTH_TOKEN, and pin npm >= 11.5.1 (Node 22 ships 10.9, which has
