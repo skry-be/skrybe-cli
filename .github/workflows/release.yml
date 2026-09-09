@@ -1,6 +1,11 @@
 name: Release
 
-# Publishes @skrybe/cli to npm.
+# Publishes @skrybe/cli to npm using trusted publishing: the runner proves its
+# identity to npm over OIDC and is issued a short-lived credential, so there is
+# no long-lived token in this repository to leak, rotate or let expire.
+#
+# This requires a trusted publisher configured on npmjs.com for @skrybe/cli,
+# naming this repository and this workflow file.
 #
 # `npm version` is told not to tag, because tagging and pushing are separate
 # steps here — the tag is what triggers this workflow, so it should not fire
@@ -22,9 +27,9 @@ on:
 
 permissions:
   contents: read
-  # Required for npm provenance, which signs the package with this workflow's
-  # identity so the npm page links the tarball back to the commit it built
-  # from. This works only because the repository is public.
+  # The OIDC token trusted publishing exchanges for a publish credential, and
+  # what provenance is signed with. Without it npm falls back to looking for a
+  # token, finds none, and fails as though the package did not exist.
   id-token: write
 
 jobs:
@@ -35,7 +40,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
           registry-url: https://registry.npmjs.org
 
@@ -55,39 +60,26 @@ jobs:
             exit 1
           fi
 
-      # `npm publish --dry-run` never contacts the registry, so without this a
-      # dry run would pass with a missing, expired or wrongly scoped token and
-      # the failure would only surface on a real tag. whoami is the cheapest
-      # call that actually authenticates, and it names the account, which
-      # catches a token minted from the wrong npm login.
-      # whoami proves who the token is, but not what it may do — a read-only
-      # token passes it. The scope check is what catches the common failure,
-      # because npm answers an unauthorised publish with 404, which reads as
-      # "no such package" and sends you looking in the wrong place entirely.
-      #
-      # A granular token's permissions are fixed when it is created, so a token
-      # minted before its owner joined the org cannot have the scope selected,
-      # and joining later does not widen it. It has to be reissued.
-      - name: Verify the npm credential
+      # npm below 11.5.1 has no OIDC support at all. It does not say so: it
+      # publishes as an anonymous user and the registry answers 404, which
+      # reads as "no such package" and sends you looking for the wrong problem
+      # entirely. Fail here instead, where the cause is stated.
+      - name: Check npm can do OIDC
         run: |
-          echo "Publishing as: $(npm whoami)"
-          if npm access list packages @skrybe > /dev/null 2>&1; then
-            echo "Token can see the @skrybe scope."
-          else
-            echo "::warning::This token cannot list @skrybe packages. If the publish fails with E404, that is why: the token needs Read and write on the @skrybe scope, and must have been created after its owner joined the org."
+          version="$(npm --version)"
+          echo "npm $version"
+          required="11.5.1"
+          lowest="$(printf '%s\n%s\n' "$version" "$required" | sort -V | head -n1)"
+          if [ "$lowest" != "$required" ] && [ "$version" != "$required" ]; then
+            echo "npm $version cannot use trusted publishing; $required or newer is required." >&2
+            exit 1
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      # Once 0.1.0 exists on the registry, this token can be replaced with npm
-      # trusted publishing: configure the trusted publisher on npmjs.com, drop
-      # NODE_AUTH_TOKEN, and pin npm >= 11.5.1 (Node 22 ships 10.9, which has
-      # no OIDC support and fails with a 404 that reads like a missing package).
+      # No credentials here on purpose. npm performs the OIDC exchange itself
+      # when it finds no token and the trusted publisher matches.
       - name: Publish
         if: ${{ !inputs.dry_run }}
         run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Pack only (dry run)
         if: ${{ inputs.dry_run }}
