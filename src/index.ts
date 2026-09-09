@@ -7,6 +7,7 @@ import { brandsCommand } from './commands/brands.js'
 import type { GlobalOptions } from './commands/context.js'
 import { listsCommand } from './commands/lists.js'
 import { statsCommand } from './commands/stats.js'
+import { subscribersCommand } from './commands/subscribers.js'
 import { notImplemented, registerStubs } from './commands/unimplemented.js'
 import { bold, dim, red } from './output.js'
 import { version } from './version.js'
@@ -47,6 +48,7 @@ program.addCommand(whoamiCommand(getGlobals))
 program.addCommand(brandsCommand(getGlobals))
 program.addCommand(lists)
 program.addCommand(campaigns)
+program.addCommand(subscribersCommand(getGlobals))
 program.addCommand(statsCommand(getGlobals))
 
 registerStubs(new Map<string, CommanderCommand>([

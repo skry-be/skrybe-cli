@@ -134,6 +134,28 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
   'invalid email address.': { code: 'invalid_email', exitCode: Exit.USAGE },
   'bounced email address.': { code: 'bounced_email', exitCode: Exit.API_ERROR },
   'email is suppressed.': { code: 'suppressed_email', exitCode: Exit.API_ERROR },
+  // unsubscribe.php's wording for an address that is not on the list, as
+  // distinct from subscription-status.php's "Email does not exist in list".
+  'email does not exist.': { code: 'subscriber_not_found', exitCode: Exit.API_ERROR },
+
+  // subscribe.php validates these before it writes anything.
+  'ip address is invalid.': { code: 'invalid_ip_address', exitCode: Exit.USAGE },
+  'country must be a valid 2 letter country code': {
+    code: 'invalid_country',
+    exitCode: Exit.USAGE,
+    hint: 'Use a two-letter ISO 3166-1 code, e.g. NG.',
+  },
+  'referrer is not a valid url': { code: 'invalid_referrer', exitCode: Exit.USAGE },
+  'consent not given.': {
+    code: 'consent_not_given',
+    exitCode: Exit.USAGE,
+    hint: 'The list requires GDPR consent — pass --gdpr.',
+  },
+  'failed recaptcha test.': {
+    code: 'recaptcha_failed',
+    exitCode: Exit.API_ERROR,
+    hint: 'The list has reCAPTCHA enabled on its subscribe form, which an API call cannot satisfy.',
+  },
 
   // Sending
   'unauthorised from email domain': {
