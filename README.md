@@ -38,6 +38,13 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe lists count <id>` | Active subscriber count for one list |
 | `skrybe brands` | Brands visible to the current key |
 | `skrybe whoami` | Show the active profile and its brand |
+| `skrybe subscribers add <email> --list <id>` | Add a subscriber, or update one already on the list |
+| `skrybe subscribers status <email> --list <id>` | Subscribed, Unsubscribed, Bounced, Complained... |
+| `skrybe subscribers unsubscribe <email> --list <id>` | Unsubscribe, keeping the record |
+| `skrybe subscribers delete <email> --list <id>` | Remove the record outright |
+| `skrybe campaigns create ...` | Create a campaign, optionally sending or scheduling it |
+| `skrybe emails send ...` | Send or schedule an email to addresses or lists |
+| `skrybe emails send-transactional ...` | Send one email immediately, bypassing the queue |
 | `skrybe auth login` | Store an API key for an install |
 | `skrybe auth list` | List saved profiles |
 | `skrybe auth logout` | Remove a saved profile |
@@ -45,9 +52,43 @@ A bare resource name shows the collection — the common case needs no verb.
 
 `ls` works as an explicit alias everywhere (`skrybe lists ls`).
 
-Commands the HTTP API cannot serve yet — `campaigns list`, `campaigns send`,
-`lists create` and friends — are registered so they fail with an explanation
-rather than "unknown command". They land with the `api/v1` build-out.
+Commands the HTTP API cannot serve yet — `campaigns list`, `lists create` and
+friends — are registered so they fail with an explanation rather than "unknown
+command". They land with the `api/v1` build-out.
+
+### Passing a body from a file
+
+An HTML email will not fit on a command line, so anywhere a value is accepted
+you can point at a file instead, using the same `file://` convention as the AWS
+CLI:
+
+```bash
+skrybe campaigns create \
+  --title 'Q4 newsletter' --subject 'Your Q4 update' \
+  --from-name Acme --from-email hello@acme.test --reply-to hello@acme.test \
+  --html-text file://campaign.html \
+  --list <list-id>
+```
+
+Add `--send` to send it immediately, or `--schedule 'June 15, 2027 6:05pm'` to
+schedule it. Without either, it stays a draft.
+
+### Custom fields
+
+`subscribers add` sets custom fields by their personalization tag name — the
+`Birthday` in `[Birthday,fallback=]`:
+
+```bash
+skrybe subscribers add ada@example.com --list <id> \
+  --name 'Ada Lovelace' --field Birthday=1990-01-01 --field City=Lagos
+```
+
+Adding an address that is already on the list updates it and exits `0`, since
+re-running a script is not a failure. `--json` reports which happened:
+
+```json
+{ "email": "ada@example.com", "list_id": "...", "outcome": "already_subscribed" }
+```
 
 ## Profiles
 

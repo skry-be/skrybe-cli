@@ -48,7 +48,7 @@ export const STUBS: Stub[] = [
     name: 'send',
     args: '<campaign-id>',
     description: 'Send an existing draft (not yet available in the API)',
-    blockedBy: 'includes/create/send-now.php',
+    blockedBy: 'includes/create/send-now.php — but `campaigns create --send` creates and sends in one call',
   },
   {
     parent: 'campaigns',
