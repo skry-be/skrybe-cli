@@ -5,6 +5,7 @@ import { CliError, Exit } from './api/errors.js'
 import { authCommand, whoamiCommand } from './commands/auth.js'
 import { brandsCommand } from './commands/brands.js'
 import { campaignsCommand } from './commands/campaigns.js'
+import { completionCommand } from './commands/completion.js'
 import type { GlobalOptions } from './commands/context.js'
 import { emailsCommand } from './commands/emails.js'
 import { listsCommand } from './commands/lists.js'
@@ -58,6 +59,7 @@ program.addCommand(campaigns)
 program.addCommand(emailsCommand(getGlobals))
 program.addCommand(subscribersCommand(getGlobals))
 program.addCommand(statsCommand(getGlobals))
+program.addCommand(completionCommand(() => program))
 
 registerStubs(new Map<string, CommanderCommand>([
   ['campaigns', campaigns],

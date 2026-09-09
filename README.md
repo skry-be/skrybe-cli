@@ -49,6 +49,7 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe auth list` | List saved profiles |
 | `skrybe auth logout` | Remove a saved profile |
 | `skrybe stats emails-sent` | Installation-wide emails-sent counter |
+| `skrybe completion <shell>` | Print a bash, zsh or fish completion script |
 
 `ls` works as an explicit alias everywhere (`skrybe lists ls`).
 
@@ -113,11 +114,37 @@ Env wins so CI needs no config file on disk.
 
 ## Scripting
 
-`--json` writes the raw payload to stdout; progress and diagnostics go to
-stderr, so redirection and pipes stay clean:
+`--output` picks the shape. Data goes to stdout and diagnostics to stderr, so
+redirection and pipes stay clean:
+
+| Format | For |
+| --- | --- |
+| `table` | reading — aligned columns with a header (the default) |
+| `json` | `jq` — the full record, with numbers and nulls intact |
+| `text` | `cut`, `while read` — tab-separated, no header, no padding |
 
 ```bash
-skrybe lists --json | jq -r '.[].id'
+skrybe lists --output json | jq -r '.[].id'
+skrybe lists --output text | cut -f2
+```
+
+`--json` is a shorthand for `--output json`, and `SKRYBE_OUTPUT` sets a default.
+
+`table` is the human format, so a command that performs an action prints a
+sentence to stderr and leaves stdout empty. Under `json` and `text` it emits its
+result record to stdout instead:
+
+```bash
+$ skrybe subscribers add ada@example.com --list <id> --output json
+{ "email": "ada@example.com", "list_id": "...", "outcome": "subscribed" }
+```
+
+Errors follow the format too, so a script does not have to parse one shape on
+success and another on failure:
+
+```bash
+$ skrybe subscribers status nobody@example.com --list bogus --output json
+{ "error": { "code": "list_id_invalid", "message": "List ID not passed", "hint": "..." } }
 ```
 
 An empty collection is a success, not an error: `skrybe lists` exits `0` and
@@ -132,6 +159,19 @@ Exit codes:
 | `2` | Usage error (bad flag, missing config, unimplemented command) |
 | `3` | Authentication failure |
 | `4` | Quota exceeded or rate limited |
+
+## Shell completion
+
+Generated from the command tree, so it stays in step with the commands:
+
+```bash
+eval "$(skrybe completion bash)"    # add to ~/.bashrc
+eval "$(skrybe completion zsh)"     # add to ~/.zshrc
+skrybe completion fish > ~/.config/fish/completions/skrybe.fish
+```
+
+It completes subcommands, aliases, long flags, and the fixed values for
+`--output` and `completion`.
 
 ## Development
 
