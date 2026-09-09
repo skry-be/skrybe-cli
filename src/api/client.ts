@@ -1,3 +1,4 @@
+import { userAgent } from '../version.js'
 import { ApiError, AuthError, Exit, classifyProse, exitCodeForStatus } from './errors.js'
 
 export interface ClientOptions {
@@ -113,14 +114,15 @@ export class SkrybeClient {
       const timer = setTimeout(() => controller.abort(), this.timeoutMs)
 
       try {
-        const init: RequestInit = { method, signal: controller.signal }
+        const headers: Record<string, string> = { 'User-Agent': userAgent() }
+        const init: RequestInit = { method, signal: controller.signal, headers }
 
         if (method === 'POST') {
           if (encoding === 'json') {
-            init.headers = { 'Content-Type': 'application/json' }
+            headers['Content-Type'] = 'application/json'
             init.body = JSON.stringify(fields)
           } else {
-            init.headers = { 'Content-Type': 'application/x-www-form-urlencoded' }
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
             init.body = new URLSearchParams(fields).toString()
           }
         }

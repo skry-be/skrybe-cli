@@ -1,5 +1,3 @@
-import { createRequire } from 'node:module'
-
 import { Command } from 'commander'
 import type { Command as CommanderCommand } from 'commander'
 
@@ -11,15 +9,7 @@ import { listsCommand } from './commands/lists.js'
 import { statsCommand } from './commands/stats.js'
 import { notImplemented, registerStubs } from './commands/unimplemented.js'
 import { bold, dim, red } from './output.js'
-
-function version(): string {
-  try {
-    const require = createRequire(import.meta.url)
-    return (require('../package.json') as { version: string }).version
-  } catch {
-    return '0.0.0'
-  }
-}
+import { version } from './version.js'
 
 const program = new Command()
 const getGlobals = (): GlobalOptions => program.opts<GlobalOptions>()
