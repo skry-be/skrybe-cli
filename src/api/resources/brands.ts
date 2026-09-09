@@ -12,7 +12,7 @@ export interface Brand extends NamedEntity {}
  * Returns `[]` when the endpoint answers "No brands found", which is not an error.
  */
 export async function listBrands(client: SkrybeClient): Promise<Brand[]> {
-  const body = await client.requestText({ path: 'api/brands/get-brands.php' })
+  const body = await client.requestText({ path: 'api/brands/get-brands.php', retryable: true })
   if (isProseEmpty(body)) return []
   return parseNumberedObject(body, 'brand')
 }

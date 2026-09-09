@@ -14,6 +14,7 @@ export async function totalEmailsSent(client: SkrybeClient): Promise<number> {
     path: 'api/stats/emails-sent.php',
     method: 'GET',
     anonymous: true,
+    retryable: true,
   })
   return data.total_emails_sent ?? 0
 }

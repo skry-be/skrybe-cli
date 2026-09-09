@@ -20,6 +20,14 @@ export interface RequestOptions {
   method?: 'GET' | 'POST'
   /** Skip api_key injection — only api/stats/emails-sent.php is public. */
   anonymous?: boolean
+  /**
+   * Opt in to retrying this request. Off by default because most endpoints
+   * here create or send something, and none of them take an idempotency key:
+   * a 504 from a send that actually landed becomes a second campaign on
+   * retry. A dropped connection cannot be distinguished from a response we
+   * never saw, so only reads set this.
+   */
+  retryable?: boolean
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000
@@ -97,8 +105,10 @@ export class SkrybeClient {
     }
     if (!opts.anonymous) fields.api_key = this.apiKey
 
+    const maxAttempts = opts.retryable ? MAX_ATTEMPTS : 1
+
     let lastError: unknown
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), this.timeoutMs)
 
@@ -117,7 +127,7 @@ export class SkrybeClient {
 
         const response = await fetch(method === 'GET' ? withQuery(target, fields) : target, init)
 
-        if (RETRYABLE_STATUS.has(response.status) && attempt < MAX_ATTEMPTS) {
+        if (RETRYABLE_STATUS.has(response.status) && attempt < maxAttempts) {
           await delay(backoffMs(attempt, response.headers.get('retry-after')))
           continue
         }
@@ -131,8 +141,7 @@ export class SkrybeClient {
             Exit.API_ERROR,
           )
         }
-        // A connect-level failure is safe to retry: the request never landed.
-        if (attempt < MAX_ATTEMPTS) {
+        if (attempt < maxAttempts) {
           await delay(backoffMs(attempt, null))
           continue
         }

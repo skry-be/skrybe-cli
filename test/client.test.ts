@@ -170,7 +170,7 @@ describe('SkrybeClient retries', () => {
     const stub = await startStub([{ status: 503, body: 'down' }, { body: 'ok' }])
     const client = new SkrybeClient({ url: stub.url, apiKey: KEY })
 
-    assert.equal(await client.requestText({ path: 'x.php' }), 'ok')
+    assert.equal(await client.requestText({ path: 'x.php', retryable: true }), 'ok')
     assert.equal(stub.received.length, 2)
   })
 
@@ -178,12 +178,32 @@ describe('SkrybeClient retries', () => {
     const stub = await startStub([{ status: 503, body: 'still down' }])
     const client = new SkrybeClient({ url: stub.url, apiKey: KEY })
 
-    await assert.rejects(client.requestText({ path: 'x.php' }), (err: unknown) => {
+    await assert.rejects(client.requestText({ path: 'x.php', retryable: true }), (err: unknown) => {
       assert.ok(err instanceof ApiError)
       assert.equal(err.status, 503)
       return true
     })
     assert.equal(stub.received.length, 3)
+  })
+
+  it('does not retry a write, even on a 503', async () => {
+    // The point of the opt-in. None of the send endpoints take an idempotency
+    // key, so a 503 from a request that actually landed would become a second
+    // campaign. Requests are single-attempt unless they say otherwise.
+    const stub = await startStub([{ status: 503, body: 'down' }, { body: 'ok' }])
+    const client = new SkrybeClient({ url: stub.url, apiKey: KEY })
+
+    await assert.rejects(client.requestText({ path: 'api/emails/send.php' }))
+    assert.equal(stub.received.length, 1)
+  })
+
+  it('does not retry a network failure on a write', async () => {
+    const client = new SkrybeClient({ url: 'http://127.0.0.1:1', apiKey: KEY })
+    const started = Date.now()
+
+    await assert.rejects(client.requestText({ path: 'api/emails/send.php' }))
+    // Three attempts would have spent at least 500ms + 1000ms backing off.
+    assert.ok(Date.now() - started < 400, 'should not have backed off and retried')
   })
 
   it('does not retry a 4xx', async () => {
@@ -202,7 +222,7 @@ describe('SkrybeClient retries', () => {
     const client = new SkrybeClient({ url: stub.url, apiKey: KEY })
 
     const started = Date.now()
-    assert.equal(await client.requestText({ path: 'x.php' }), 'ok')
+    assert.equal(await client.requestText({ path: 'x.php', retryable: true }), 'ok')
     assert.ok(Date.now() - started < 400, 'should not have waited out the default backoff')
   })
 

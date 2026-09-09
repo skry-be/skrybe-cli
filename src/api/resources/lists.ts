@@ -21,6 +21,7 @@ export async function listLists(
   const body = await client.requestText({
     path: 'api/lists/get-lists.php',
     body: { include_hidden: opts.includeHidden ? 'yes' : 'no' },
+    retryable: true,
   })
   if (isProseEmpty(body)) return []
   return parseNumberedObject(body, 'list')
@@ -41,6 +42,7 @@ export async function activeSubscriberCount(
   const body = await client.requestText({
     path: 'api/subscribers/active-subscriber-count.php',
     body: { list_id: listId },
+    retryable: true,
   })
 
   const trimmed = body.trim()
