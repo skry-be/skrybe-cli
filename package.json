@@ -16,15 +16,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/skry-be/skrybe-dashboard.git",
-    "directory": "cli"
+    "url": "git+https://github.com/skry-be/skrybe-cli.git"
   },
-  "homepage": "https://github.com/skry-be/skrybe-dashboard/tree/main/cli#readme",
+  "homepage": "https://github.com/skry-be/skrybe-cli#readme",
   "bugs": {
-    "url": "https://github.com/skry-be/skrybe-dashboard/issues"
+    "url": "https://github.com/skry-be/skrybe-cli/issues"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "scripts": {
     "build": "tsup",
