@@ -13,7 +13,7 @@ import {
   resolveProfile,
   saveProfile,
 } from '../config.js'
-import { bold, dim, info, printJson, printTable, success } from '../output.js'
+import { bold, dim, info, printJson, printTable, renderCollection, resolveFormat, success } from '../output.js'
 import { clientFrom, type GlobalOptions } from './context.js'
 
 /**
@@ -95,19 +95,16 @@ export function authCommand(getGlobals: () => GlobalOptions): Command {
         current: name === config.currentProfile,
       }))
 
-      if (getGlobals().json) {
-        printJson(rows)
-        return
-      }
-      if (rows.length === 0) {
-        info(dim('No profiles saved. Run `skrybe auth login --url <url>`.'))
-        return
-      }
-      printTable(rows, [
-        { header: '', value: (r) => (r.current ? '*' : ' ') },
-        { header: 'PROFILE', value: (r) => r.name },
-        { header: 'URL', value: (r) => r.url },
-      ])
+      renderCollection(
+        rows,
+        [
+          { header: '', value: (r) => (r.current ? '*' : ' ') },
+          { header: 'PROFILE', value: (r) => r.name },
+          { header: 'URL', value: (r) => r.url },
+        ],
+        resolveFormat(getGlobals()),
+        'No profiles saved. Run `skrybe auth login --url <url>`.',
+      )
     })
 
   auth
@@ -137,8 +134,15 @@ export function whoamiCommand(getGlobals: () => GlobalOptions): Command {
       const profile = resolveProfile({ profile: globals.profile, url: globals.url })
       const brands = await listBrands(clientFrom(globals))
 
-      if (globals.json) {
+      const format = resolveFormat(globals)
+      if (format === 'json') {
         printJson({ profile: profile.name, url: profile.url, brands })
+        return
+      }
+      if (format === 'text') {
+        for (const brand of brands.length > 0 ? brands : [{ id: '', name: '' }]) {
+          process.stdout.write(`${profile.name ?? ''}\t${profile.url}\t${brand.id}\t${brand.name}\n`)
+        }
         return
       }
 

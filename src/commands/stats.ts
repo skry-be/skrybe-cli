@@ -3,7 +3,7 @@ import { Command } from 'commander'
 import { SkrybeClient } from '../api/client.js'
 import { totalEmailsSent } from '../api/resources/stats.js'
 import { normaliseUrl, resolveProfile } from '../config.js'
-import { printJson } from '../output.js'
+import { renderScalar, resolveFormat } from '../output.js'
 import type { GlobalOptions } from './context.js'
 
 export function statsCommand(getGlobals: () => GlobalOptions): Command {
@@ -23,8 +23,11 @@ export function statsCommand(getGlobals: () => GlobalOptions): Command {
       const client = new SkrybeClient({ url, apiKey: '' })
       const total = await totalEmailsSent(client)
 
-      if (globals.json) printJson({ total_emails_sent: total })
-      else process.stdout.write(`${total.toLocaleString('en-US')}\n`)
+      renderScalar(
+        resolveFormat(globals) === 'table' ? total.toLocaleString('en-US') : total,
+        { total_emails_sent: total },
+        resolveFormat(globals),
+      )
     })
 
   return stats

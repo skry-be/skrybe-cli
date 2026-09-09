@@ -2,7 +2,7 @@ import { Command } from 'commander'
 
 import { createCampaign } from '../api/resources/campaigns.js'
 import { resolveArg, resolveOptionalArg } from '../input.js'
-import { printJson, success } from '../output.js'
+import { renderAction, resolveFormat } from '../output.js'
 import { clientFrom, type GlobalOptions } from './context.js'
 import { notImplemented } from './unimplemented.js'
 
@@ -82,18 +82,17 @@ export function campaignsCommand(getGlobals: () => GlobalOptions): Command {
         scheduleTimezone: options.timezone,
       })
 
-      if (globals.json) {
-        printJson({ outcome: result.outcome, campaign_id: result.campaignId ?? null })
-        return
-      }
-
       const what =
         result.outcome === 'sending'
           ? 'Campaign created and now sending'
           : result.outcome === 'scheduled'
             ? 'Campaign scheduled'
             : 'Campaign created'
-      success(result.campaignId ? `${what} (id ${result.campaignId}).` : `${what}.`)
+      renderAction(
+        { outcome: result.outcome, campaign_id: result.campaignId ?? null },
+        result.campaignId ? `${what} (id ${result.campaignId}).` : `${what}.`,
+        resolveFormat(globals),
+      )
     })
 
   return campaigns

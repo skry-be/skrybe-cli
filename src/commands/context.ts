@@ -4,6 +4,9 @@ import { resolveProfile } from '../config.js'
 export interface GlobalOptions {
   profile?: string
   url?: string
+  /** `table` (default), `json` or `text`. */
+  output?: string
+  /** Shorthand for `--output json`. */
   json?: boolean
 }
 

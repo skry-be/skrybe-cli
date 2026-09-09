@@ -3,7 +3,7 @@ import { Command } from 'commander'
 import { UsageError } from '../api/errors.js'
 import { sendEmail, sendTransactional } from '../api/resources/emails.js'
 import { resolveArg, resolveOptionalArg } from '../input.js'
-import { printJson, success } from '../output.js'
+import { renderAction, resolveFormat } from '../output.js'
 import { clientFrom, type GlobalOptions } from './context.js'
 
 interface SendOptions {
@@ -108,8 +108,11 @@ export function emailsCommand(getGlobals: () => GlobalOptions): Command {
         scheduleTimezone: options.timezone,
       })
 
-      if (globals.json) printJson({ message: result.message, campaign_id: result.campaignId ?? null })
-      else success(result.campaignId ? `${result.message} (id ${result.campaignId}).` : `${result.message}.`)
+      renderAction(
+        { message: result.message, campaign_id: result.campaignId ?? null },
+        result.campaignId ? `${result.message} (id ${result.campaignId}).` : `${result.message}.`,
+        resolveFormat(globals),
+      )
     })
 
   emails
@@ -134,8 +137,11 @@ export function emailsCommand(getGlobals: () => GlobalOptions): Command {
         replyTo: options.replyTo,
       })
 
-      if (globals.json) printJson({ message: result.message, message_id: result.messageId ?? null })
-      else success(result.messageId ? `${result.message} (${result.messageId})` : result.message)
+      renderAction(
+        { message: result.message, message_id: result.messageId ?? null },
+        result.messageId ? `${result.message} (${result.messageId})` : result.message,
+        resolveFormat(globals),
+      )
     })
 
   return emails

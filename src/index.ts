@@ -11,7 +11,7 @@ import { listsCommand } from './commands/lists.js'
 import { statsCommand } from './commands/stats.js'
 import { subscribersCommand } from './commands/subscribers.js'
 import { registerStubs } from './commands/unimplemented.js'
-import { bold, dim, red } from './output.js'
+import { bold, dim, red, resolveFormat, type OutputFormat } from './output.js'
 import { version } from './version.js'
 
 const program = new Command()
@@ -23,10 +23,20 @@ program
   .version(version(), '-v, --version')
   .option('--profile <name>', 'Credential profile to use (default: the current profile)')
   .option('--url <url>', 'Override the Skrybe base URL for this invocation')
-  .option('--json', 'Emit raw JSON on stdout instead of a table')
+  .option('--output <format>', 'Output format: table (default), json or text')
+  .option('--json', 'Shorthand for --output json')
   .addHelpText(
     'after',
     `
+${bold('Output')}
+  --output table   aligned columns, for reading (the default)
+  --output json    the full record, for jq
+  --output text    tab-separated, no header, for cut and while read
+
+  Commands that perform an action print a sentence to stderr under 'table',
+  and emit their result record to stdout under 'json' and 'text'.
+  Set a default with SKRYBE_OUTPUT.
+
 ${bold('Credentials')}
   Resolution order: SKRYBE_API_KEY / SKRYBE_API_URL, then --profile,
   then SKRYBE_PROFILE, then the current profile in the config file.
@@ -54,16 +64,40 @@ registerStubs(new Map<string, CommanderCommand>([
   ['lists', lists],
 ]))
 
+/**
+ * The format may be unreadable here — this runs for parse failures too, before
+ * options are known — so fall back to the human format rather than throwing a
+ * second error while reporting the first.
+ */
+function errorFormat(): OutputFormat {
+  try {
+    return resolveFormat(program.opts<GlobalOptions>())
+  } catch {
+    return 'table'
+  }
+}
+
+/**
+ * Errors go to stderr in every format. Under `json` they go as JSON: a script
+ * running with --output json otherwise gets JSON on success and prose on
+ * failure, and has to parse two shapes to find out which happened.
+ */
 function report(err: unknown): number {
-  if (err instanceof CliError) {
-    process.stderr.write(`${red('Error')} [${err.code}]: ${err.message}\n`)
-    if (err.hint) process.stderr.write(`${dim(err.hint)}\n`)
-    return err.exitCode
+  const cli = err instanceof CliError ? err : null
+  const code = cli?.code ?? 'error'
+  const message = cli ? cli.message : err instanceof Error ? err.message : String(err)
+  const exitCode = cli?.exitCode ?? Exit.API_ERROR
+
+  if (errorFormat() === 'json') {
+    process.stderr.write(
+      `${JSON.stringify({ error: { code, message, hint: cli?.hint ?? null } }, null, 2)}\n`,
+    )
+    return exitCode
   }
 
-  const message = err instanceof Error ? err.message : String(err)
-  process.stderr.write(`${red('Error')}: ${message}\n`)
-  return Exit.API_ERROR
+  process.stderr.write(cli ? `${red('Error')} [${code}]: ${message}\n` : `${red('Error')}: ${message}\n`)
+  if (cli?.hint) process.stderr.write(`${dim(cli.hint)}\n`)
+  return exitCode
 }
 
 /** Codes Commander uses when it has already printed the requested output. */

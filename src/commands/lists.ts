@@ -1,7 +1,7 @@
 import { Command } from 'commander'
 
 import { activeSubscriberCount, listLists } from '../api/resources/lists.js'
-import { dim, info, printJson, printTable, warn } from '../output.js'
+import { renderCollection, renderScalar, resolveFormat, warn } from '../output.js'
 import { clientFrom, type GlobalOptions } from './context.js'
 
 interface ListOptions {
@@ -11,14 +11,14 @@ interface ListOptions {
 
 async function showLists(getGlobals: () => GlobalOptions, options: ListOptions): Promise<void> {
   const globals = getGlobals()
+  const format = resolveFormat(globals)
   const client = clientFrom(globals)
   const rows = await listLists(client, { includeHidden: options.includeHidden })
 
   if (rows.length === 0) {
     // An empty collection is not a failure — exit 0, and say so on stderr so
-    // `--json` still emits a valid empty array on stdout.
-    if (globals.json) printJson([])
-    else info(dim('No lists yet. Create one in the Skrybe UI.'))
+    // the machine formats still emit a valid empty result on stdout.
+    renderCollection([], [], format, 'No lists yet. Create one in the Skrybe UI.')
     return
   }
 
@@ -40,12 +40,7 @@ async function showLists(getGlobals: () => GlobalOptions, options: ListOptions):
     ...(counts ? { active_subscribers: counts[i] ?? null } : {}),
   }))
 
-  if (globals.json) {
-    printJson(enriched)
-    return
-  }
-
-  printTable(enriched, [
+  renderCollection(enriched, [
     { header: 'ID', value: (r) => r.id },
     { header: 'NAME', value: (r) => r.name },
     ...(counts
@@ -58,7 +53,7 @@ async function showLists(getGlobals: () => GlobalOptions, options: ListOptions):
           },
         ]
       : []),
-  ])
+  ], format)
 }
 
 export function listsCommand(getGlobals: () => GlobalOptions): Command {
@@ -89,8 +84,7 @@ export function listsCommand(getGlobals: () => GlobalOptions): Command {
       const globals = getGlobals()
       const count = await activeSubscriberCount(clientFrom(globals), listId)
 
-      if (globals.json) printJson({ list_id: listId, active_subscribers: count })
-      else process.stdout.write(`${count}\n`)
+      renderScalar(count, { list_id: listId, active_subscribers: count }, resolveFormat(globals))
     })
 
   return lists

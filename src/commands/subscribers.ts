@@ -7,7 +7,7 @@ import {
   unsubscribe,
 } from '../api/resources/subscribers.js'
 import { parseFields } from '../input.js'
-import { printJson, success } from '../output.js'
+import { renderAction, renderScalar, resolveFormat } from '../output.js'
 import { clientFrom, type GlobalOptions } from './context.js'
 
 interface AddOptions {
@@ -63,14 +63,12 @@ export function subscribersCommand(getGlobals: () => GlobalOptions): Command {
         fields: parseFields(options.field),
       })
 
-      if (globals.json) {
-        printJson({ email, list_id: options.list, outcome })
-        return
-      }
-      success(
+      renderAction(
+        { email, list_id: options.list, outcome },
         outcome === 'already_subscribed'
           ? `${email} was already subscribed; its details were updated.`
           : `${email} subscribed.`,
+        resolveFormat(globals),
       )
     })
 
@@ -82,8 +80,11 @@ export function subscribersCommand(getGlobals: () => GlobalOptions): Command {
       const globals = getGlobals()
       await unsubscribe(clientFrom(globals), { listId: options.list, email })
 
-      if (globals.json) printJson({ email, list_id: options.list, outcome: 'unsubscribed' })
-      else success(`${email} unsubscribed.`)
+      renderAction(
+        { email, list_id: options.list, outcome: 'unsubscribed' },
+        `${email} unsubscribed.`,
+        resolveFormat(globals),
+      )
     })
 
   subscribers
@@ -95,8 +96,11 @@ export function subscribersCommand(getGlobals: () => GlobalOptions): Command {
       const globals = getGlobals()
       await deleteSubscriber(clientFrom(globals), { listId: options.list, email })
 
-      if (globals.json) printJson({ email, list_id: options.list, outcome: 'deleted' })
-      else success(`${email} deleted.`)
+      renderAction(
+        { email, list_id: options.list, outcome: 'deleted' },
+        `${email} deleted.`,
+        resolveFormat(globals),
+      )
     })
 
   subscribers
@@ -112,8 +116,7 @@ export function subscribersCommand(getGlobals: () => GlobalOptions): Command {
 
       // Bare value on stdout, so `skrybe subscribers status ... | grep -q Subscribed`
       // and `$(...)` capture behave.
-      if (globals.json) printJson({ email, list_id: options.list, status })
-      else process.stdout.write(`${status}\n`)
+      renderScalar(status, { email, list_id: options.list, status }, resolveFormat(globals))
     })
 
   return subscribers
