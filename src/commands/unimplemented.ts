@@ -7,9 +7,10 @@ import { CliError, Exit } from '../api/errors.js'
  * they exist only as session-authenticated UI pages, and the login is Turnstile
  * and 2FA gated, so there is nothing to call.
  *
- * Registering them as real commands means `skrybe campaigns list` explains the
+ * Registering them as real commands means `skrybe campaigns send` explains the
  * situation instead of printing "unknown command", and it fixes the command
- * names now so adding the api/v1 endpoint later is not a breaking change.
+ * names now so adding the endpoint later is not a breaking change. The API is
+ * gaining these one endpoint at a time; each stub goes when its endpoint lands.
  */
 export interface Stub {
   parent: string
@@ -22,27 +23,6 @@ export interface Stub {
 }
 
 export const STUBS: Stub[] = [
-  {
-    parent: 'campaigns',
-    name: 'list',
-    aliases: ['ls'],
-    description: 'List campaigns (not yet available in the API)',
-    blockedBy: 'includes/campaigns/list-campaigns-ajax.php',
-  },
-  {
-    parent: 'campaigns',
-    name: 'get',
-    args: '<campaign-id>',
-    description: 'Show one campaign (not yet available in the API)',
-    blockedBy: 'report.php',
-  },
-  {
-    parent: 'campaigns',
-    name: 'stats',
-    args: '<campaign-id>',
-    description: 'Opens, clicks, bounces for a campaign (not yet available in the API)',
-    blockedBy: 'report.php and includes/reports/main.php',
-  },
   {
     parent: 'campaigns',
     name: 'send',
@@ -87,7 +67,7 @@ export function notImplemented(parent: string, name: string, blockedBy: string):
     'not_implemented',
     `\`skrybe ${parent}${name ? ` ${name}` : ''}\` is not available yet: the Skrybe HTTP API has no endpoint for it.`,
     Exit.USAGE,
-    `This operation currently exists only in the web UI (${blockedBy}).\nIt is planned for the api/v1 build-out.`,
+    `This operation currently exists only in the web UI (${blockedBy}).\nIt is being added to the API in stages.`,
   )
 }
 

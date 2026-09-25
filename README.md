@@ -42,6 +42,9 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe subscribers status <email> --list <id>` | Subscribed, Unsubscribed, Bounced, Complained... |
 | `skrybe subscribers unsubscribe <email> --list <id>` | Unsubscribe, keeping the record |
 | `skrybe subscribers delete <email> --list <id>` | Remove the record outright |
+| `skrybe campaigns` | Campaigns, newest first (`--status`, `--page`, `--limit`, `--all`) |
+| `skrybe campaigns get <id>` | One campaign's details; `--content` prints its HTML |
+| `skrybe campaigns stats <id>` | Opens, clicks, bounces, complaints, unsubscribes, per-link clicks |
 | `skrybe campaigns create ...` | Create a campaign, optionally sending or scheduling it |
 | `skrybe emails send ...` | Send or schedule an email to addresses or lists |
 | `skrybe emails send-transactional ...` | Send one email immediately, bypassing the queue |
@@ -53,9 +56,9 @@ A bare resource name shows the collection — the common case needs no verb.
 
 `ls` works as an explicit alias everywhere (`skrybe lists ls`).
 
-Commands the HTTP API cannot serve yet — `campaigns list`, `lists create` and
+Commands the HTTP API cannot serve yet — `campaigns send`, `lists create` and
 friends — are registered so they fail with an explanation rather than "unknown
-command". They land with the `api/v1` build-out.
+command". The API is gaining them one endpoint at a time.
 
 ### Passing a body from a file
 

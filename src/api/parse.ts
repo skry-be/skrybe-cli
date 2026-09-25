@@ -106,3 +106,45 @@ function sortByNumericSuffix(
     .sort((a, b) => a.sort - b.sort)
     .map((x) => x.row)
 }
+
+/**
+ * Parse a numbered payload from an endpoint that builds it with json_encode()
+ * (`api/campaigns/get-campaigns.php`), so the rows are trusted as-is rather
+ * than cut down to `{id, name}`.
+ *
+ * @param prefix the key prefix the endpoint uses, e.g. `campaign`
+ * @throws if the body is not a JSON object
+ */
+export function parseNumberedRecords<T>(body: string, prefix: string): T[] {
+  const parsed = parseJsonObject<Record<string, unknown>>(body, `${prefix} payload`)
+  const key = new RegExp(`^${prefix}(\\d+)$`)
+
+  return Object.entries(parsed)
+    .map(([name, value]) => ({ match: key.exec(name), value }))
+    .filter((entry): entry is { match: RegExpExecArray; value: unknown } =>
+      entry.match !== null && entry.value !== null && typeof entry.value === 'object',
+    )
+    .sort((a, b) => Number(a.match[1]) - Number(b.match[1]))
+    .map((entry) => entry.value as T)
+}
+
+/**
+ * Parse a body that must be a JSON object, e.g. `api/campaigns/stats.php`.
+ * Anything else is almost always a PHP warning or a proxy page, so the body
+ * itself goes in the hint.
+ */
+export function parseJsonObject<T>(body: string, what: string): T {
+  const trimmed = body.trim()
+  try {
+    const parsed: unknown = JSON.parse(trimmed)
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as T
+  } catch {
+    // Reported below with the body intact.
+  }
+  throw new ApiError(
+    'malformed_response',
+    `Could not parse the ${what} returned by the API.`,
+    Exit.API_ERROR,
+    { raw: body, hint: `The server sent: ${excerpt(trimmed)}` },
+  )
+}
