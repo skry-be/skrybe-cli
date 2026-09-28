@@ -160,3 +160,47 @@ export function renderAction(
   else if (format === 'text') printText([Object.values(record).map((v) => (v == null ? '' : String(v)))])
   else success(human)
 }
+
+/**
+ * Flatten a record to `key\tvalue` rows for `--output text`: nested objects
+ * become dotted keys, arrays of scalars are comma-joined, and arrays of
+ * objects are indexed (`links.0.url`).
+ */
+export function flattenRecord(value: unknown, prefix = ''): [string, string][] {
+  if (value === null || value === undefined) return [[prefix, '']]
+  if (Array.isArray(value)) {
+    if (value.every((v) => v === null || typeof v !== 'object')) {
+      return [[prefix, value.map((v) => (v == null ? '' : String(v))).join(',')]]
+    }
+    return value.flatMap((v, i) => flattenRecord(v, prefix ? `${prefix}.${i}` : String(i)))
+  }
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>).flatMap(([k, v]) =>
+      flattenRecord(v, prefix ? `${prefix}.${k}` : k),
+    )
+  }
+  return [[prefix, String(value)]]
+}
+
+/**
+ * Render one record. `json` emits it as given, `text` flattens it to
+ * `key\tvalue` rows, and `table` prints the labelled `rows` the caller chose.
+ */
+export function renderRecord(
+  record: object,
+  rows: [label: string, value: string][],
+  format: OutputFormat,
+): void {
+  if (format === 'json') {
+    printJson(record)
+    return
+  }
+  if (format === 'text') {
+    printText(flattenRecord(record))
+    return
+  }
+  const width = Math.max(...rows.map(([label]) => label.length))
+  for (const [label, value] of rows) {
+    process.stdout.write(`${bold(label.padEnd(width))}  ${value}\n`)
+  }
+}

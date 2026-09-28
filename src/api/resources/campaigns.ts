@@ -1,5 +1,6 @@
 import type { SkrybeClient } from '../client.js'
-import { ApiError, Exit, excerpt } from '../errors.js'
+import { ApiError, Exit, excerpt, isProseEmpty } from '../errors.js'
+import { parseJsonObject, parseNumberedRecords } from '../parse.js'
 
 export interface CampaignInput {
   fromName: string
@@ -95,4 +96,120 @@ export async function createCampaign(
     Exit.API_ERROR,
     { raw: text },
   )
+}
+
+/** As the brand's campaign list labels them (app.php). */
+export const CAMPAIGN_STATUSES = ['draft', 'scheduled', 'preparing', 'sending', 'sent', 'paused'] as const
+export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number]
+
+/**
+ * One row of `api/campaigns/get-campaigns.php`. Field names are the API's, so
+ * `--json` output matches what the endpoint documents.
+ */
+export interface Campaign {
+  id: number
+  title: string
+  subject: string
+  status: CampaignStatus
+  from_name: string
+  from_email: string
+  reply_to: string
+  recipients: number
+  to_send: number
+  /** Unix seconds. */
+  sent_at: number | null
+  /** Unix seconds, only while scheduled. */
+  scheduled_at: number | null
+  timezone: string | null
+  /** `ui`, or `api` for campaigns created by `emails send`. */
+  source: string
+}
+
+export interface CampaignDetail extends Campaign {
+  preheader: string
+  query_string: string
+  track_opens: number
+  track_clicks: number
+  /** Encrypted, like the ids `skrybe lists` prints. */
+  list_ids: string[]
+  exclude_list_ids: string[]
+  segment_ids: number[]
+  exclude_segment_ids: number[]
+  web_version: string
+  /** Only with `includeContent`. */
+  html_text?: string
+  plain_text?: string
+}
+
+export interface CampaignStats {
+  id: number
+  status: CampaignStatus
+  recipients: number
+  /** `rate` is a percentage of delivered (recipients less hard bounces). */
+  opens: { total: number; unique: number; rate: number }
+  /** `rate` is a percentage of recipients. */
+  clicks: { total: number; unique: number; rate: number }
+  bounces: { hard: number; soft: number }
+  complaints: number
+  unsubscribes: number
+  links: { url: string; clicks: number; unique_clicks: number }[]
+}
+
+export interface ListCampaignsOptions {
+  /** 1-based. */
+  page?: number
+  /** The server caps this at 100. */
+  limit?: number
+  status?: CampaignStatus
+}
+
+export const MAX_PAGE_SIZE = 100
+
+/** Newest first. An empty page is an empty array, not an error. */
+export async function listCampaigns(
+  client: SkrybeClient,
+  opts: ListCampaignsOptions = {},
+): Promise<Campaign[]> {
+  const body = await client.requestText({
+    path: 'api/campaigns/get-campaigns.php',
+    body: { page: opts.page, limit: opts.limit, status: opts.status },
+    retryable: true,
+  })
+  if (isProseEmpty(body)) return []
+  return parseNumberedRecords<Campaign>(body, 'campaign')
+}
+
+/** Every page, fetched in order at the largest page size. */
+export async function listAllCampaigns(
+  client: SkrybeClient,
+  opts: Omit<ListCampaignsOptions, 'page' | 'limit'> = {},
+): Promise<Campaign[]> {
+  const all: Campaign[] = []
+  for (let page = 1; ; page++) {
+    const rows = await listCampaigns(client, { ...opts, page, limit: MAX_PAGE_SIZE })
+    all.push(...rows)
+    if (rows.length < MAX_PAGE_SIZE) return all
+  }
+}
+
+export async function getCampaign(
+  client: SkrybeClient,
+  campaignId: number,
+  opts: { includeContent?: boolean } = {},
+): Promise<CampaignDetail> {
+  const body = await client.requestText({
+    path: 'api/campaigns/get-campaign.php',
+    body: { campaign_id: campaignId, include_content: opts.includeContent ? 'yes' : undefined },
+    retryable: true,
+  })
+  return parseJsonObject<CampaignDetail>(body, 'campaign')
+}
+
+export async function campaignStats(client: SkrybeClient, campaignId: number): Promise<CampaignStats> {
+  const body = await client.requestText({
+    path: 'api/campaigns/stats.php',
+    body: { campaign_id: campaignId },
+    retryable: true,
+  })
+  return parseJsonObject<CampaignStats>(body, 'campaign stats')
 }

@@ -89,7 +89,7 @@ interface ProseRule {
  * Matched case-insensitively against the trimmed body, exact match first.
  *
  * Sources: api/_connect.php callers, api/lists/get-lists.php,
- * api/brands/get-brands.php, api/subscribers/*.php, api/campaigns/create.php,
+ * api/brands/get-brands.php, api/subscribers/*.php, api/campaigns/*.php,
  * subscribe.php, unsubscribe.php.
  */
 const PROSE_ERRORS: Record<string, ProseRule> = {
@@ -107,7 +107,12 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
 
   // Brands and lists
   'brand id not passed': { code: 'brand_id_missing', exitCode: Exit.USAGE },
-  'brand does not exist': { code: 'brand_not_found', exitCode: Exit.API_ERROR },
+  // Also the answer to the install's main account key, which no brand is tied to.
+  'brand does not exist': {
+    code: 'brand_not_found',
+    exitCode: Exit.API_ERROR,
+    hint: 'Use an API key from a brand login; the main account key is not tied to a brand.',
+  },
   'list does not exist': {
     code: 'list_not_found',
     exitCode: Exit.API_ERROR,
@@ -125,6 +130,15 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
     exitCode: Exit.USAGE,
     hint: 'A list ID is the encrypted value `skrybe lists` prints, not the integer in the UI URL.',
   },
+
+  // Campaigns (get-campaigns.php, get-campaign.php, stats.php)
+  'campaign id not passed': { code: 'campaign_id_missing', exitCode: Exit.USAGE },
+  'campaign does not exist': {
+    code: 'campaign_not_found',
+    exitCode: Exit.API_ERROR,
+    hint: 'Run `skrybe campaigns` to see the IDs available to this API key.',
+  },
+  'invalid status': { code: 'invalid_status', exitCode: Exit.USAGE },
 
   // Subscribers
   'subscriber does not exist': { code: 'subscriber_not_found', exitCode: Exit.API_ERROR },
@@ -166,11 +180,11 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
 }
 
 /**
- * Bodies that mean "nothing to return" rather than a failure. get-lists.php
- * and get-brands.php answer with prose instead of an empty object when the
+ * Bodies that mean "nothing to return" rather than a failure. get-lists.php,
+ * get-brands.php and get-campaigns.php answer with prose instead of an empty object when the
  * brand has no rows, and an empty collection is not an error.
  */
-const PROSE_EMPTY = new Set(['no lists found', 'no brands found'])
+const PROSE_EMPTY = new Set(['no lists found', 'no brands found', 'no campaigns found'])
 
 export function isProseEmpty(body: string): boolean {
   return PROSE_EMPTY.has(body.trim().toLowerCase())

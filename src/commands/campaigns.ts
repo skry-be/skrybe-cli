@@ -1,10 +1,20 @@
-import { Command } from 'commander'
+import { Command, Option } from 'commander'
 
-import { createCampaign } from '../api/resources/campaigns.js'
+import { UsageError } from '../api/errors.js'
+import {
+  CAMPAIGN_STATUSES,
+  MAX_PAGE_SIZE,
+  campaignStats,
+  createCampaign,
+  getCampaign,
+  listAllCampaigns,
+  listCampaigns,
+  type Campaign,
+  type CampaignStatus,
+} from '../api/resources/campaigns.js'
 import { resolveArg, resolveOptionalArg } from '../input.js'
-import { renderAction, resolveFormat } from '../output.js'
+import { printTable, renderAction, renderCollection, renderRecord, resolveFormat } from '../output.js'
 import { clientFrom, type GlobalOptions } from './context.js'
-import { notImplemented } from './unimplemented.js'
 
 interface CreateOptions {
   fromName: string
@@ -28,17 +38,169 @@ interface CreateOptions {
 
 const collect = (value: string, previous: string[]): string[] => [...previous, value]
 
+interface ListOptions {
+  status?: CampaignStatus
+  page?: string
+  limit?: string
+  all?: boolean
+}
+
+/** Campaign ids are the plain integers the dashboard shows, unlike list ids. */
+function campaignId(value: string): number {
+  if (!/^\d+$/.test(value) || Number(value) === 0) {
+    throw new UsageError(`"${value}" is not a campaign ID.`, 'Run `skrybe campaigns` to see the IDs.')
+  }
+  return Number(value)
+}
+
+function positive(value: string | undefined, flag: string, max?: number): number | undefined {
+  if (value === undefined) return undefined
+  const n = Number(value)
+  if (!Number.isInteger(n) || n < 1 || (max !== undefined && n > max)) {
+    throw new UsageError(`${flag} must be a whole number from 1${max ? ` to ${max}` : ' up'}.`)
+  }
+  return n
+}
+
+/** Unix seconds -> "2026-08-31 10:18" in the local timezone. */
+function when(seconds: number | null): string {
+  if (seconds === null) return '-'
+  const d = new Date(seconds * 1000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+const count = (n: number): string => n.toLocaleString('en-US')
+
+function listOptions(command: Command): Command {
+  return command
+    .addOption(new Option('--status <status>', 'Only campaigns in this state').choices(CAMPAIGN_STATUSES))
+    .option('--page <n>', 'Page to show, newest first (default 1)')
+    .option('--limit <n>', `Campaigns per page, up to ${MAX_PAGE_SIZE} (default 10)`)
+    .option('--all', 'Fetch every page')
+}
+
+async function showCampaigns(getGlobals: () => GlobalOptions, options: ListOptions): Promise<void> {
+  const globals = getGlobals()
+  const format = resolveFormat(globals)
+  const client = clientFrom(globals)
+
+  if (options.all && (options.page !== undefined || options.limit !== undefined)) {
+    throw new UsageError('--all fetches every page, so it cannot be combined with --page or --limit.')
+  }
+  const rows = options.all
+    ? await listAllCampaigns(client, { status: options.status })
+    : await listCampaigns(client, {
+        status: options.status,
+        page: positive(options.page, '--page'),
+        limit: positive(options.limit, '--limit', MAX_PAGE_SIZE),
+      })
+
+  renderCollection<Campaign>(
+    rows,
+    [
+      { header: 'ID', value: (c) => String(c.id), align: 'right' },
+      { header: 'STATUS', value: (c) => c.status },
+      { header: 'DATE', value: (c) => when(c.status === 'scheduled' ? c.scheduled_at : c.sent_at) },
+      { header: 'RECIPIENTS', value: (c) => count(c.recipients), align: 'right' },
+      { header: 'TITLE', value: (c) => c.title },
+    ],
+    format,
+    options.status ? `No ${options.status} campaigns.` : 'No campaigns on this page.',
+  )
+}
+
 /** `--track-opens 2` etc. Commander hands options over as strings. */
 const tracking = (value: string | undefined): number | undefined =>
   value === undefined ? undefined : Number(value)
 
 export function campaignsCommand(getGlobals: () => GlobalOptions): Command {
-  // A bare `skrybe campaigns` means "show them", which the API still cannot do,
-  // so it explains itself rather than printing a help page of stubs.
-  const campaigns = new Command('campaigns')
-    .description('Campaigns — create and send; listing is not yet in the API')
-    .allowExcessArguments(false)
-    .action(() => notImplemented('campaigns', '', 'includes/campaigns/list-campaigns-ajax.php'))
+  // `skrybe campaigns` shows them, like `skrybe lists`; sub-verbs still dispatch.
+  const campaigns = listOptions(
+    new Command('campaigns')
+      .description('Campaigns — run bare to show them, newest first')
+      // Without this, `skrybe campaigns bogus` would list instead of erroring.
+      .allowExcessArguments(false),
+  ).action((options: ListOptions) => showCampaigns(getGlobals, options))
+
+  // The parent declares the same options and Commander hands them to it, so
+  // `campaigns ls --status sent` reads them through optsWithGlobals().
+  listOptions(
+    campaigns.command('ls').alias('list').description('Show campaigns for the current brand, newest first'),
+  ).action((_options: ListOptions, command: Command) =>
+    showCampaigns(getGlobals, command.optsWithGlobals<ListOptions>()),
+  )
+
+  campaigns
+    .command('get <campaign-id>')
+    .description('Show one campaign')
+    .option('--content', 'Print the HTML body instead (with --json, include both bodies)')
+    .action(async (id: string, options: { content?: boolean }) => {
+      const globals = getGlobals()
+      const format = resolveFormat(globals)
+      const c = await getCampaign(clientFrom(globals), campaignId(id), { includeContent: options.content })
+
+      // Raw, so `skrybe campaigns get 42 --content > email.html` saves the email.
+      if (options.content && format !== 'json') {
+        process.stdout.write(`${c.html_text || c.plain_text || ''}\n`)
+        return
+      }
+
+      const lists = (ids: (string | number)[]) => (ids.length ? ids.join(', ') : '-')
+      renderRecord(
+        c,
+        [
+          ['ID', String(c.id)],
+          ['Title', c.title],
+          ['Subject', c.subject],
+          ['Status', c.status],
+          ['From', `${c.from_name} <${c.from_email}>`],
+          ['Reply to', c.reply_to],
+          ['Recipients', `${count(c.recipients)} of ${count(c.to_send)}`],
+          ['Sent', when(c.sent_at)],
+          ...(c.scheduled_at !== null
+            ? [['Scheduled', `${when(c.scheduled_at)}${c.timezone ? ` (${c.timezone})` : ''}`] as [string, string]]
+            : []),
+          ['Lists', lists(c.list_ids)],
+          ['Excluded lists', lists(c.exclude_list_ids)],
+          ['Segments', lists(c.segment_ids)],
+          ['Excluded segments', lists(c.exclude_segment_ids)],
+          ['Web version', c.web_version],
+        ],
+        format,
+      )
+    })
+
+  campaigns
+    .command('stats <campaign-id>')
+    .description('Opens, clicks, bounces, complaints and unsubscribes for a campaign')
+    .action(async (id: string) => {
+      const globals = getGlobals()
+      const format = resolveFormat(globals)
+      const s = await campaignStats(clientFrom(globals), campaignId(id))
+
+      renderRecord(
+        s,
+        [
+          ['Status', s.status],
+          ['Recipients', count(s.recipients)],
+          ['Opens', `${count(s.opens.unique)} unique (${s.opens.rate}%), ${count(s.opens.total)} total`],
+          ['Clicks', `${count(s.clicks.unique)} unique (${s.clicks.rate}%), ${count(s.clicks.total)} total`],
+          ['Bounces', `${count(s.bounces.hard)} hard, ${count(s.bounces.soft)} soft`],
+          ['Complaints', count(s.complaints)],
+          ['Unsubscribes', count(s.unsubscribes)],
+        ],
+        format,
+      )
+      if (format === 'table' && s.links.length > 0) {
+        process.stdout.write('\n')
+        printTable(s.links, [
+          { header: 'CLICKS', value: (l) => count(l.clicks), align: 'right' },
+          { header: 'UNIQUE', value: (l) => count(l.unique_clicks), align: 'right' },
+          { header: 'LINK', value: (l) => l.url },
+        ])
+      }
+    })
 
   campaigns
     .command('create')
