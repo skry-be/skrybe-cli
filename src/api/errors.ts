@@ -162,6 +162,18 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
     exitCode: Exit.API_ERROR,
     hint: 'Unschedule it in the Skrybe UI first, or leave it to send at its scheduled time.',
   },
+  // Test sends (campaigns/test-send.php, sharing its gates with the UI)
+  'email addresses not passed': {
+    code: 'emails_missing',
+    exitCode: Exit.USAGE,
+    hint: 'Pass at least one --to address.',
+  },
+  'too many email addresses': {
+    code: 'too_many_emails',
+    exitCode: Exit.USAGE,
+    hint: 'A test send goes to at most 5 addresses.',
+  },
+  'quota exceeded. please upgrade your plan.': { code: 'quota_exceeded', exitCode: Exit.QUOTA_OR_RATE_LIMIT },
   'no active subscribers to send to': {
     code: 'no_recipients',
     exitCode: Exit.API_ERROR,
@@ -219,6 +231,30 @@ const PROSE_PATTERN_ERRORS: [RegExp, ProseRule][] = [
       code: 'account_under_review',
       exitCode: Exit.API_ERROR,
       hint: 'Sending is paused while the brand is reviewed for a high bounce rate. Contact Skrybe support.',
+    },
+  ],
+  [
+    /^brand is under review/,
+    {
+      code: 'account_under_review',
+      exitCode: Exit.API_ERROR,
+      hint: 'Sending is paused while the brand is reviewed for a high bounce rate. Contact Skrybe support.',
+    },
+  ],
+  [
+    /^test send rate limit reached/,
+    {
+      code: 'rate_limited',
+      exitCode: Exit.QUOTA_OR_RATE_LIMIT,
+      hint: 'Test sends are limited to 20 an hour per brand, shared with the Skrybe UI.',
+    },
+  ],
+  [
+    /^domain not verified in ses/,
+    {
+      code: 'domain_not_verified',
+      exitCode: Exit.API_ERROR,
+      hint: "Verify the campaign's From domain for this brand in the Skrybe UI.",
     },
   ],
   [

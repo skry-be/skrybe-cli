@@ -47,6 +47,7 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe campaigns stats <id>` | Opens, clicks, bounces, complaints, unsubscribes, per-link clicks |
 | `skrybe campaigns create ...` | Create a campaign, optionally sending or scheduling it |
 | `skrybe campaigns send <id> --list <id>` | Send a draft now (`--dry-run` counts recipients, sends nothing) |
+| `skrybe campaigns test <id> --to <email>` | Send a test to up to 5 addresses (20 requests an hour per brand) |
 | `skrybe emails send ...` | Send or schedule an email to addresses or lists |
 | `skrybe emails send-transactional ...` | Send one email immediately, bypassing the queue |
 | `skrybe auth login` | Store an API key for an install |
@@ -95,6 +96,18 @@ It asks before sending. From a script, where there is no one to answer, it
 refuses unless you pass `--yes`. Only a draft can be sent, so running it again
 after a dropped connection reports `campaign_not_draft` instead of sending a
 second time.
+
+### Test sends
+
+`campaigns test` sends a campaign to a few addresses before it goes to a list:
+
+```bash
+skrybe campaigns test 42 --to ada@example.com --to team@example.com
+```
+
+It sends to at most 5 addresses per call. Each brand gets 20 test sends an
+hour, shared with the test-send box in the Skrybe UI. It exits `1` if any
+address fails, and `--json` shows the result for each address.
 
 ### Custom fields
 

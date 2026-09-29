@@ -255,3 +255,29 @@ export async function sendCampaign(
   })
   return parseJsonObject<SendCampaignResult>(body, 'send result')
 }
+
+/** api/campaigns/test-send.php refuses more than this many addresses per request. */
+export const MAX_TEST_EMAILS = 5
+
+export interface TestSendResult {
+  campaign_id: number
+  /** One per address, in the order sent. */
+  results: { email: string; ok: boolean; error: string | null }[]
+}
+
+/**
+ * `api/campaigns/test-send.php` sends the campaign as a test, the same way the
+ * UI's test-send box does. Each request counts against a per-brand limit
+ * shared with the UI (20 an hour), so it is never retried.
+ */
+export async function testSendCampaign(
+  client: SkrybeClient,
+  campaignId: number,
+  emails: string[],
+): Promise<TestSendResult> {
+  const body = await client.requestText({
+    path: 'api/campaigns/test-send.php',
+    body: { campaign_id: campaignId, emails: emails.join(',') },
+  })
+  return parseJsonObject<TestSendResult>(body, 'test send result')
+}

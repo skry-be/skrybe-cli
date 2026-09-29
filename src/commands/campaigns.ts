@@ -1,20 +1,32 @@
 import { Command, Option } from 'commander'
 
-import { UsageError } from '../api/errors.js'
+import { ApiError, Exit, UsageError } from '../api/errors.js'
 import {
   CAMPAIGN_STATUSES,
   MAX_PAGE_SIZE,
+  MAX_TEST_EMAILS,
   campaignStats,
   createCampaign,
   getCampaign,
   listAllCampaigns,
   listCampaigns,
   sendCampaign,
+  testSendCampaign,
   type Campaign,
   type CampaignStatus,
 } from '../api/resources/campaigns.js'
 import { confirm, resolveArg, resolveOptionalArg } from '../input.js'
-import { info, printTable, renderAction, renderCollection, renderRecord, resolveFormat } from '../output.js'
+import {
+  info,
+  printJson,
+  printTable,
+  renderAction,
+  renderCollection,
+  renderRecord,
+  resolveFormat,
+  success,
+  warn,
+} from '../output.js'
 import { clientFrom, type GlobalOptions } from './context.js'
 
 interface CreateOptions {
@@ -269,6 +281,54 @@ export function campaignsCommand(getGlobals: () => GlobalOptions): Command {
         `Campaign ${r.campaign_id} is sending to ${count(r.recipients)} recipients.`,
         format,
       )
+    })
+
+  campaigns
+    .command('test <campaign-id>')
+    .description(`Send a campaign as a test to up to ${MAX_TEST_EMAILS} addresses`)
+    .option('--to <email>', 'Address to send to. Repeatable, or comma-separated.', collect, [])
+    .action(async (id: string, options: { to: string[] }) => {
+      const globals = getGlobals()
+      const format = resolveFormat(globals)
+      const campaign = campaignId(id)
+
+      const emails = [...new Set(options.to.flatMap((to) => to.split(',')).map((e) => e.trim()).filter(Boolean))]
+      if (emails.length === 0) {
+        throw new UsageError('Nothing to send to.', 'Pass at least one --to address.')
+      }
+      if (emails.length > MAX_TEST_EMAILS) {
+        throw new UsageError(`A test send goes to at most ${MAX_TEST_EMAILS} addresses; got ${emails.length}.`)
+      }
+
+      const r = await testSendCampaign(clientFrom(globals), campaign, emails)
+      const failed = r.results.filter((result) => !result.ok)
+
+      if (format === 'json') printJson(r)
+      else if (format === 'text') {
+        renderCollection(
+          r.results,
+          [
+            { header: 'EMAIL', value: (x) => x.email },
+            { header: 'RESULT', value: (x) => (x.ok ? 'sent' : 'failed') },
+            { header: 'ERROR', value: (x) => x.error ?? '' },
+          ],
+          format,
+          '',
+        )
+      } else {
+        for (const result of r.results) {
+          if (result.ok) success(`Test of campaign ${r.campaign_id} sent to ${result.email}.`)
+          else warn(`Test to ${result.email} failed: ${result.error ?? 'unknown error'}`)
+        }
+      }
+
+      if (failed.length > 0) {
+        throw new ApiError(
+          'test_send_failed',
+          `${failed.length} of ${r.results.length} test ${r.results.length === 1 ? 'email' : 'emails'} failed.`,
+          Exit.API_ERROR,
+        )
+      }
     })
 
   campaigns
