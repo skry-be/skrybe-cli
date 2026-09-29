@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { createInterface } from 'node:readline/promises'
 
 import { UsageError } from './api/errors.js'
 
@@ -59,4 +60,18 @@ export function parseFields(pairs: string[]): Record<string, string> {
     out[pair.slice(0, at)] = pair.slice(at + 1)
   }
   return out
+}
+
+/**
+ * Ask a yes/no question on stderr, defaulting to no. Only call this when stdin
+ * is a TTY: a script has no one to answer, so commands that confirm take
+ * `--yes` instead and refuse without it.
+ */
+export async function confirm(question: string): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stderr })
+  try {
+    return /^y(es)?$/i.test((await rl.question(`${question} [y/N] `)).trim())
+  } finally {
+    rl.close()
+  }
 }

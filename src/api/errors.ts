@@ -140,6 +140,34 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
   },
   'invalid status': { code: 'invalid_status', exitCode: Exit.USAGE },
 
+  // Sending a campaign (campaigns/send.php; the list and segment wording is create.php's too)
+  'list or segment id(s) not passed': {
+    code: 'recipients_missing',
+    exitCode: Exit.USAGE,
+    hint: 'Pass at least one --list or --segment.',
+  },
+  'one or more list ids are invalid': {
+    code: 'list_not_found',
+    exitCode: Exit.API_ERROR,
+    hint: 'Run `skrybe lists` to see the IDs available to this API key.',
+  },
+  'one or more segment ids are invalid': { code: 'segment_not_found', exitCode: Exit.API_ERROR },
+  'campaign has already been sent': {
+    code: 'campaign_not_draft',
+    exitCode: Exit.API_ERROR,
+    hint: 'Only a draft can be sent. `skrybe campaigns get <id>` shows its status.',
+  },
+  'campaign is scheduled': {
+    code: 'campaign_scheduled',
+    exitCode: Exit.API_ERROR,
+    hint: 'Unschedule it in the Skrybe UI first, or leave it to send at its scheduled time.',
+  },
+  'no active subscribers to send to': {
+    code: 'no_recipients',
+    exitCode: Exit.API_ERROR,
+    hint: 'Every subscriber on those lists is unsubscribed, bounced, unconfirmed or excluded.',
+  },
+
   // Subscribers
   'subscriber does not exist': { code: 'subscriber_not_found', exitCode: Exit.API_ERROR },
   'email does not exist in list': { code: 'subscriber_not_found', exitCode: Exit.API_ERROR },
@@ -180,6 +208,30 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
 }
 
 /**
+ * Prose that embeds a variable part — a domain name, a review reason — matched
+ * by pattern instead. Checked after the exact table.
+ */
+const PROSE_PATTERN_ERRORS: [RegExp, ProseRule][] = [
+  [/^error: this campaign would exceed/, { code: 'quota_exceeded', exitCode: Exit.QUOTA_OR_RATE_LIMIT }],
+  [
+    /^account under review:/,
+    {
+      code: 'account_under_review',
+      exitCode: Exit.API_ERROR,
+      hint: 'Sending is paused while the brand is reviewed for a high bounce rate. Contact Skrybe support.',
+    },
+  ],
+  [
+    /^domain ".*" is not verified/,
+    {
+      code: 'domain_not_verified',
+      exitCode: Exit.API_ERROR,
+      hint: "Verify the campaign's From domain for this brand in the Skrybe UI.",
+    },
+  ],
+]
+
+/**
  * Bodies that mean "nothing to return" rather than a failure. get-lists.php,
  * get-brands.php and get-campaigns.php answer with prose instead of an empty object when the
  * brand has no rows, and an empty collection is not an error.
@@ -215,6 +267,12 @@ export function classifyProse(body: string, status?: number): ApiError | null {
   const rule = PROSE_ERRORS[key]
   if (rule) {
     return new ApiError(rule.code, trimmed, rule.exitCode, { raw: body, status, hint: rule.hint })
+  }
+
+  for (const [pattern, patternRule] of PROSE_PATTERN_ERRORS) {
+    if (pattern.test(key)) {
+      return new ApiError(patternRule.code, trimmed, patternRule.exitCode, { raw: body, status, hint: patternRule.hint })
+    }
   }
 
   // `api/campaigns/create.php` emits a family of "Unable to ..." failures that

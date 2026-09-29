@@ -46,6 +46,7 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe campaigns get <id>` | One campaign's details; `--content` prints its HTML |
 | `skrybe campaigns stats <id>` | Opens, clicks, bounces, complaints, unsubscribes, per-link clicks |
 | `skrybe campaigns create ...` | Create a campaign, optionally sending or scheduling it |
+| `skrybe campaigns send <id> --list <id>` | Send a draft now (`--dry-run` counts recipients, sends nothing) |
 | `skrybe emails send ...` | Send or schedule an email to addresses or lists |
 | `skrybe emails send-transactional ...` | Send one email immediately, bypassing the queue |
 | `skrybe auth login` | Store an API key for an install |
@@ -56,7 +57,7 @@ A bare resource name shows the collection — the common case needs no verb.
 
 `ls` works as an explicit alias everywhere (`skrybe lists ls`).
 
-Commands the HTTP API cannot serve yet — `campaigns send`, `lists create` and
+Commands the HTTP API cannot serve yet — `campaigns stop`, `lists create` and
 friends — are registered so they fail with an explanation rather than "unknown
 command". The API is gaining them one endpoint at a time.
 
@@ -76,6 +77,24 @@ skrybe campaigns create \
 
 Add `--send` to send it immediately, or `--schedule 'June 15, 2027 6:05pm'` to
 schedule it. Without either, it stays a draft.
+
+### Sending a draft
+
+`campaigns send` sends a campaign that is still a draft, to the lists and
+segments you name:
+
+```bash
+skrybe campaigns send 42 --list <list-id> --exclude-list <list-id> --dry-run
+# ✓ Campaign 42 would go to 1,204 recipients. Nothing was sent.
+
+skrybe campaigns send 42 --list <list-id> --exclude-list <list-id>
+# Send campaign 42 to 1,204 recipients? [y/N]
+```
+
+It asks before sending. From a script, where there is no one to answer, it
+refuses unless you pass `--yes`. Only a draft can be sent, so running it again
+after a dropped connection reports `campaign_not_draft` instead of sending a
+second time.
 
 ### Custom fields
 

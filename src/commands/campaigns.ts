@@ -9,11 +9,12 @@ import {
   getCampaign,
   listAllCampaigns,
   listCampaigns,
+  sendCampaign,
   type Campaign,
   type CampaignStatus,
 } from '../api/resources/campaigns.js'
-import { resolveArg, resolveOptionalArg } from '../input.js'
-import { printTable, renderAction, renderCollection, renderRecord, resolveFormat } from '../output.js'
+import { confirm, resolveArg, resolveOptionalArg } from '../input.js'
+import { info, printTable, renderAction, renderCollection, renderRecord, resolveFormat } from '../output.js'
 import { clientFrom, type GlobalOptions } from './context.js'
 
 interface CreateOptions {
@@ -37,6 +38,15 @@ interface CreateOptions {
 }
 
 const collect = (value: string, previous: string[]): string[] => [...previous, value]
+
+interface SendOptions {
+  list: string[]
+  segment: string[]
+  excludeList: string[]
+  excludeSegment: string[]
+  dryRun?: boolean
+  yes?: boolean
+}
 
 interface ListOptions {
   status?: CampaignStatus
@@ -200,6 +210,65 @@ export function campaignsCommand(getGlobals: () => GlobalOptions): Command {
           { header: 'LINK', value: (l) => l.url },
         ])
       }
+    })
+
+  campaigns
+    .command('send <campaign-id>')
+    .description('Send a draft campaign now')
+    .option('--list <list-id>', 'List to send to. Repeatable.', collect, [])
+    .option('--segment <segment-id>', 'Segment to send to. Repeatable.', collect, [])
+    .option('--exclude-list <list-id>', 'List to exclude. Repeatable.', collect, [])
+    .option('--exclude-segment <segment-id>', 'Segment to exclude. Repeatable.', collect, [])
+    .option('--dry-run', 'Check everything and count the recipients, but send nothing')
+    .option('-y, --yes', 'Send without asking for confirmation (required when not run interactively)')
+    .action(async (id: string, options: SendOptions) => {
+      const globals = getGlobals()
+      const format = resolveFormat(globals)
+      const client = clientFrom(globals)
+      const campaign = campaignId(id)
+
+      if (options.list.length === 0 && options.segment.length === 0) {
+        throw new UsageError('Nothing to send to.', 'Pass at least one --list or --segment.')
+      }
+      const recipients = {
+        listIds: options.list,
+        segmentIds: options.segment,
+        excludeListIds: options.excludeList,
+        excludeSegmentIds: options.excludeSegment,
+      }
+
+      if (options.dryRun) {
+        const r = await sendCampaign(client, campaign, { ...recipients, dryRun: true })
+        renderAction(
+          { outcome: r.status, campaign_id: r.campaign_id, recipients: r.recipients },
+          `Campaign ${r.campaign_id} would go to ${count(r.recipients)} recipients. Nothing was sent.`,
+          format,
+        )
+        return
+      }
+
+      if (!options.yes) {
+        if (!process.stdin.isTTY) {
+          throw new UsageError(
+            'Refusing to send without confirmation.',
+            'Pass --yes to send from a script, or --dry-run to check it first.',
+          )
+        }
+        // The dry run doubles as the preflight: a bad list or an unverified
+        // domain fails here, before anyone is asked to confirm.
+        const preview = await sendCampaign(client, campaign, { ...recipients, dryRun: true })
+        if (!(await confirm(`Send campaign ${campaign} to ${count(preview.recipients)} recipients?`))) {
+          info('Not sent.')
+          return
+        }
+      }
+
+      const r = await sendCampaign(client, campaign, recipients)
+      renderAction(
+        { outcome: r.status, campaign_id: r.campaign_id, recipients: r.recipients },
+        `Campaign ${r.campaign_id} is sending to ${count(r.recipients)} recipients.`,
+        format,
+      )
     })
 
   campaigns
