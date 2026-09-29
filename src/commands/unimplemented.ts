@@ -37,21 +37,6 @@ export const STUBS: Stub[] = [
     description: 'Resume a stopped campaign (not yet available in the API)',
     blockedBy: 'includes/create/resume-campaign.php',
   },
-  {
-    parent: 'lists',
-    name: 'create',
-    args: '<name>',
-    description: 'Create a list (not yet available in the API)',
-    blockedBy: 'includes/subscribers/import-add.php',
-  },
-  {
-    parent: 'lists',
-    name: 'delete',
-    aliases: ['rm'],
-    args: '<list-id>',
-    description: 'Delete a list (not yet available in the API)',
-    blockedBy: 'includes/list/delete.php',
-  },
 ]
 
 /** The error a stubbed operation raises, shared by the parent default and the leaf. */

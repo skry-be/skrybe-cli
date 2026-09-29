@@ -36,6 +36,10 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe lists` | Subscriber lists for the current brand |
 | `skrybe lists --counts` | ...with active subscriber counts (one request per list) |
 | `skrybe lists count <id>` | Active subscriber count for one list |
+| `skrybe lists get <id>` | One list, with subscribers counted by state |
+| `skrybe lists create <name>` | Create a list (`--opt-in double`); prints the new id |
+| `skrybe lists update <id>` | Rename a list (`--name`) or switch its `--opt-in` |
+| `skrybe lists delete <id>` | Delete a list and its subscribers (asks first; `--yes` in scripts) |
 | `skrybe brands` | Brands visible to the current key |
 | `skrybe whoami` | Show the active profile and its brand |
 | `skrybe subscribers add <email> --list <id>` | Add a subscriber, or update one already on the list |
@@ -60,8 +64,8 @@ A bare resource name shows the collection — the common case needs no verb.
 
 `ls` works as an explicit alias everywhere (`skrybe lists ls`).
 
-Commands the HTTP API cannot serve yet — `campaigns stop`, `lists create` and
-friends — are registered so they fail with an explanation rather than "unknown
+Commands the HTTP API cannot serve yet — `campaigns stop` and `campaigns
+resume` — are registered so they fail with an explanation rather than "unknown
 command". The API is gaining them one endpoint at a time.
 
 ### Passing a body from a file

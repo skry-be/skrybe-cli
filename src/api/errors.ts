@@ -131,6 +131,21 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
     hint: 'A list ID is the encrypted value `skrybe lists` prints, not the integer in the UI URL.',
   },
 
+  // List management (lists/create.php, update-list.php, delete.php)
+  'list name not passed': { code: 'list_name_missing', exitCode: Exit.USAGE },
+  'list name is too long': {
+    code: 'list_name_too_long',
+    exitCode: Exit.USAGE,
+    hint: 'A list name can be at most 100 characters.',
+  },
+  'opt_in must be single or double': { code: 'invalid_opt_in', exitCode: Exit.USAGE },
+  'nothing to update': { code: 'nothing_to_update', exitCode: Exit.USAGE, hint: 'Pass --name and/or --opt-in.' },
+  'list is used by a scheduled or sending campaign': {
+    code: 'list_in_use',
+    exitCode: Exit.API_ERROR,
+    hint: 'Unschedule the campaign, or wait for it to finish sending, then delete the list.',
+  },
+
   // Campaigns (get-campaigns.php, get-campaign.php, stats.php)
   'campaign id not passed': { code: 'campaign_id_missing', exitCode: Exit.USAGE },
   'campaign does not exist': {

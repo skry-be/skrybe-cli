@@ -1,6 +1,6 @@
 import type { SkrybeClient } from '../client.js'
 import { ApiError, Exit, excerpt, isProseEmpty } from '../errors.js'
-import { parseNumberedObject, type NamedEntity } from '../parse.js'
+import { parseJsonObject, parseNumberedObject, type NamedEntity } from '../parse.js'
 
 export interface List extends NamedEntity {
   /**
@@ -55,4 +55,45 @@ export async function activeSubscriberCount(
     )
   }
   return Number.parseInt(trimmed, 10)
+}
+
+export type OptIn = 'single' | 'double'
+
+/** One list from `api/lists/get-list.php`, `create.php` or `update-list.php`. */
+export interface ListDetail extends List {
+  opt_in: OptIn
+  /** `active` is who a campaign goes to: confirmed, and not unsubscribed, bounced or complained. */
+  subscribers: { active: number; unconfirmed: number; unsubscribed: number; bounced: number; complained: number }
+}
+
+export async function getList(client: SkrybeClient, listId: string): Promise<ListDetail> {
+  const body = await client.requestText({ path: 'api/lists/get-list.php', body: { list_id: listId }, retryable: true })
+  return parseJsonObject<ListDetail>(body, 'list')
+}
+
+/** Not retried: a repeat after a lost response would create a second list. */
+export async function createList(client: SkrybeClient, name: string, optIn?: OptIn): Promise<ListDetail> {
+  const body = await client.requestText({ path: 'api/lists/create.php', body: { name, opt_in: optIn } })
+  return parseJsonObject<ListDetail>(body, 'list')
+}
+
+export async function updateList(
+  client: SkrybeClient,
+  listId: string,
+  changes: { name?: string; optIn?: OptIn },
+): Promise<ListDetail> {
+  const body = await client.requestText({
+    path: 'api/lists/update-list.php',
+    body: { list_id: listId, name: changes.name, opt_in: changes.optIn },
+  })
+  return parseJsonObject<ListDetail>(body, 'list')
+}
+
+/**
+ * Deletes the list with its subscribers, segments, autoresponders and rules.
+ * The API refuses a list that a scheduled or sending campaign is going to.
+ */
+export async function deleteList(client: SkrybeClient, listId: string): Promise<{ id: string; deleted: true }> {
+  const body = await client.requestText({ path: 'api/lists/delete.php', body: { list_id: listId } })
+  return parseJsonObject<{ id: string; deleted: true }>(body, 'delete result')
 }
