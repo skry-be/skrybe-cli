@@ -29,6 +29,7 @@ import {
   resolveFormat,
   success,
   warn,
+  when,
 } from '../output.js'
 import { clientFrom, type GlobalOptions } from './context.js'
 
@@ -131,13 +132,6 @@ function positive(value: string | undefined, flag: string, max?: number): number
   return n
 }
 
-/** Unix seconds -> "2026-08-31 10:18" in the local timezone. */
-function when(seconds: number | null): string {
-  if (seconds === null) return '-'
-  const d = new Date(seconds * 1000)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 
 const count = (n: number): string => n.toLocaleString('en-US')
 

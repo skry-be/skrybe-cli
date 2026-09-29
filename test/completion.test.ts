@@ -23,7 +23,7 @@ describe('completion', () => {
   it('completes an alias as a path, not just as a suggestion', () => {
     // `skrybe subs <tab>` has to reach the subscribers subcommands; without an
     // entry keyed on the alias it would silently fall back to the root list.
-    assert.match(generate('bash'), /"subs"\) echo "add unsubscribe delete/)
+    assert.match(generate('bash'), /"subs"\) echo "ls list add unsubscribe delete/)
   })
 
   it('offers the shells for `completion` and the formats for --output', () => {

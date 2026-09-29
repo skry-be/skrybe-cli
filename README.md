@@ -42,6 +42,7 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe lists delete <id>` | Delete a list and its subscribers (asks first; `--yes` in scripts) |
 | `skrybe brands` | Brands visible to the current key |
 | `skrybe whoami` | Show the active profile and its brand |
+| `skrybe subscribers ls --list <id>` | A list's subscribers, oldest first (`--status`, `--page`, `--limit`, `--all`) |
 | `skrybe subscribers add <email> --list <id>` | Add a subscriber, or update one already on the list |
 | `skrybe subscribers status <email> --list <id>` | Subscribed, Unsubscribed, Bounced, Complained... |
 | `skrybe subscribers unsubscribe <email> --list <id>` | Unsubscribe, keeping the record |
@@ -130,6 +131,21 @@ skrybe campaigns test 42 --to ada@example.com --to team@example.com
 It sends to at most 5 addresses per call. Each brand gets 20 test sends an
 hour, shared with the test-send box in the Skrybe UI. It exits `1` if any
 address fails, and `--json` shows the result for each address.
+
+### Exporting a list
+
+`subscribers ls` pages through a list, oldest first. Each subscriber is in
+exactly one state: `active`, `unconfirmed`, `unsubscribed`, `bounced` or
+`complained`. `active` is who a campaign sends to.
+
+```bash
+skrybe subscribers ls --list <id> --status active --all --output text > active.tsv
+skrybe subscribers ls --list <id> --all --json | jq '.[] | {email, city: .custom_fields.City}'
+```
+
+`--output text` gives email, name, status and join time, tab-separated.
+`--json` adds each subscriber's custom fields by name, with dates as
+`YYYY-MM-DD`.
 
 ### Custom fields
 
