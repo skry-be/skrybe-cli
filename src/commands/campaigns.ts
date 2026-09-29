@@ -10,9 +10,12 @@ import {
   getCampaign,
   listAllCampaigns,
   listCampaigns,
+  scheduleCampaign,
   sendCampaign,
   testSendCampaign,
+  unscheduleCampaign,
   type Campaign,
+  type ScheduleCampaignResult,
   type CampaignStatus,
 } from '../api/resources/campaigns.js'
 import { confirm, resolveArg, resolveOptionalArg } from '../input.js'
@@ -60,6 +63,50 @@ interface SendOptions {
   yes?: boolean
 }
 
+interface ScheduleOptions extends SendOptions {
+  at: string
+  timezone?: string
+}
+
+/** The recipient flags, --dry-run and --yes that `send` and `schedule` share. */
+function recipientOptions(command: Command, verb: string): Command {
+  return command
+    .option('--list <list-id>', 'List to send to. Repeatable.', collect, [])
+    .option('--segment <segment-id>', 'Segment to send to. Repeatable.', collect, [])
+    .option('--exclude-list <list-id>', 'List to exclude. Repeatable.', collect, [])
+    .option('--exclude-segment <segment-id>', 'Segment to exclude. Repeatable.', collect, [])
+    .option('--dry-run', 'Check everything and count the recipients, but change nothing')
+    .option('-y, --yes', `${verb} without asking for confirmation (required when not run interactively)`)
+}
+
+function recipientsFrom(options: SendOptions) {
+  if (options.list.length === 0 && options.segment.length === 0) {
+    throw new UsageError('Nothing to send to.', 'Pass at least one --list or --segment.')
+  }
+  return {
+    listIds: options.list,
+    segmentIds: options.segment,
+    excludeListIds: options.excludeList,
+    excludeSegmentIds: options.excludeSegment,
+  }
+}
+
+/**
+ * Ask before committing to a send. `question` runs a dry run first, so a bad
+ * list or an unverified domain fails before anyone is asked. Without a
+ * terminal there is no one to ask, so --yes is required instead.
+ */
+async function confirmed(options: SendOptions, verb: string, question: () => Promise<string>): Promise<boolean> {
+  if (options.yes) return true
+  if (!process.stdin.isTTY) {
+    throw new UsageError(
+      `Refusing to ${verb} without confirmation.`,
+      `Pass --yes to ${verb} from a script, or --dry-run to check it first.`,
+    )
+  }
+  return confirm(await question())
+}
+
 interface ListOptions {
   status?: CampaignStatus
   page?: string
@@ -93,6 +140,29 @@ function when(seconds: number | null): string {
 }
 
 const count = (n: number): string => n.toLocaleString('en-US')
+
+/** Unix seconds -> "2027-06-15 18:05 Africa/Lagos", in the campaign's own timezone. */
+function whenIn(seconds: number, timeZone: string): string {
+  try {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      })
+        .formatToParts(new Date(seconds * 1000))
+        .map((p) => [p.type, p.value]),
+    )
+    return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute} ${timeZone}`
+  } catch {
+    // A timezone this Node build doesn't know: fall back to local time.
+    return when(seconds)
+  }
+}
 
 function listOptions(command: Command): Command {
   return command
@@ -181,7 +251,7 @@ export function campaignsCommand(getGlobals: () => GlobalOptions): Command {
           ['Recipients', `${count(c.recipients)} of ${count(c.to_send)}`],
           ['Sent', when(c.sent_at)],
           ...(c.scheduled_at !== null
-            ? [['Scheduled', `${when(c.scheduled_at)}${c.timezone ? ` (${c.timezone})` : ''}`] as [string, string]]
+            ? [['Scheduled', c.timezone ? whenIn(c.scheduled_at, c.timezone) : when(c.scheduled_at)] as [string, string]]
             : []),
           ['Lists', lists(c.list_ids)],
           ['Excluded lists', lists(c.exclude_list_ids)],
@@ -224,62 +294,96 @@ export function campaignsCommand(getGlobals: () => GlobalOptions): Command {
       }
     })
 
-  campaigns
-    .command('send <campaign-id>')
-    .description('Send a draft campaign now')
-    .option('--list <list-id>', 'List to send to. Repeatable.', collect, [])
-    .option('--segment <segment-id>', 'Segment to send to. Repeatable.', collect, [])
-    .option('--exclude-list <list-id>', 'List to exclude. Repeatable.', collect, [])
-    .option('--exclude-segment <segment-id>', 'Segment to exclude. Repeatable.', collect, [])
-    .option('--dry-run', 'Check everything and count the recipients, but send nothing')
-    .option('-y, --yes', 'Send without asking for confirmation (required when not run interactively)')
-    .action(async (id: string, options: SendOptions) => {
-      const globals = getGlobals()
-      const format = resolveFormat(globals)
-      const client = clientFrom(globals)
-      const campaign = campaignId(id)
+  recipientOptions(
+    campaigns.command('send <campaign-id>').description('Send a draft campaign now'),
+    'Send',
+  ).action(async (id: string, options: SendOptions) => {
+    const globals = getGlobals()
+    const format = resolveFormat(globals)
+    const client = clientFrom(globals)
+    const campaign = campaignId(id)
+    const recipients = recipientsFrom(options)
 
-      if (options.list.length === 0 && options.segment.length === 0) {
-        throw new UsageError('Nothing to send to.', 'Pass at least one --list or --segment.')
-      }
-      const recipients = {
-        listIds: options.list,
-        segmentIds: options.segment,
-        excludeListIds: options.excludeList,
-        excludeSegmentIds: options.excludeSegment,
-      }
-
-      if (options.dryRun) {
-        const r = await sendCampaign(client, campaign, { ...recipients, dryRun: true })
-        renderAction(
-          { outcome: r.status, campaign_id: r.campaign_id, recipients: r.recipients },
-          `Campaign ${r.campaign_id} would go to ${count(r.recipients)} recipients. Nothing was sent.`,
-          format,
-        )
-        return
-      }
-
-      if (!options.yes) {
-        if (!process.stdin.isTTY) {
-          throw new UsageError(
-            'Refusing to send without confirmation.',
-            'Pass --yes to send from a script, or --dry-run to check it first.',
-          )
-        }
-        // The dry run doubles as the preflight: a bad list or an unverified
-        // domain fails here, before anyone is asked to confirm.
-        const preview = await sendCampaign(client, campaign, { ...recipients, dryRun: true })
-        if (!(await confirm(`Send campaign ${campaign} to ${count(preview.recipients)} recipients?`))) {
-          info('Not sent.')
-          return
-        }
-      }
-
-      const r = await sendCampaign(client, campaign, recipients)
+    if (options.dryRun) {
+      const r = await sendCampaign(client, campaign, { ...recipients, dryRun: true })
       renderAction(
         { outcome: r.status, campaign_id: r.campaign_id, recipients: r.recipients },
-        `Campaign ${r.campaign_id} is sending to ${count(r.recipients)} recipients.`,
+        `Campaign ${r.campaign_id} would go to ${count(r.recipients)} recipients. Nothing was sent.`,
         format,
+      )
+      return
+    }
+
+    const go = await confirmed(options, 'send', async () => {
+      const preview = await sendCampaign(client, campaign, { ...recipients, dryRun: true })
+      return `Send campaign ${campaign} to ${count(preview.recipients)} recipients?`
+    })
+    if (!go) return info('Not sent.')
+
+    const r = await sendCampaign(client, campaign, recipients)
+    renderAction(
+      { outcome: r.status, campaign_id: r.campaign_id, recipients: r.recipients },
+      `Campaign ${r.campaign_id} is sending to ${count(r.recipients)} recipients.`,
+      format,
+    )
+  })
+
+  recipientOptions(
+    campaigns
+      .command('schedule <campaign-id>')
+      .description('Schedule a draft campaign, or move a scheduled one')
+      .requiredOption('--at <date-time>', 'When to send, e.g. "2027-06-15 18:05" or "June 15, 2027 6:05pm"')
+      .option('--timezone <tz>', 'e.g. Africa/Lagos. Defaults to the account timezone'),
+    'Schedule',
+  ).action(async (id: string, options: ScheduleOptions) => {
+    const globals = getGlobals()
+    const format = resolveFormat(globals)
+    const client = clientFrom(globals)
+    const campaign = campaignId(id)
+    const input = { ...recipientsFrom(options), at: options.at, timezone: options.timezone }
+
+    const record = (r: ScheduleCampaignResult) => ({
+      outcome: r.status,
+      campaign_id: r.campaign_id,
+      recipients: r.recipients,
+      scheduled_at: r.scheduled_at,
+      timezone: r.timezone,
+    })
+
+    if (options.dryRun) {
+      const r = await scheduleCampaign(client, campaign, { ...input, dryRun: true })
+      renderAction(
+        record(r),
+        `Campaign ${r.campaign_id} would be scheduled for ${whenIn(r.scheduled_at, r.timezone)} to ${count(r.recipients)} recipients. Nothing was changed.`,
+        format,
+      )
+      return
+    }
+
+    const go = await confirmed(options, 'schedule', async () => {
+      const preview = await scheduleCampaign(client, campaign, { ...input, dryRun: true })
+      return `Schedule campaign ${campaign} for ${whenIn(preview.scheduled_at, preview.timezone)} to ${count(preview.recipients)} recipients?`
+    })
+    if (!go) return info('Not scheduled.')
+
+    const r = await scheduleCampaign(client, campaign, input)
+    renderAction(
+      record(r),
+      `Campaign ${r.campaign_id} is scheduled for ${whenIn(r.scheduled_at, r.timezone)} to ${count(r.recipients)} recipients.`,
+      format,
+    )
+  })
+
+  campaigns
+    .command('unschedule <campaign-id>')
+    .description('Turn a scheduled campaign back into a draft')
+    .action(async (id: string) => {
+      const globals = getGlobals()
+      const r = await unscheduleCampaign(clientFrom(globals), campaignId(id))
+      renderAction(
+        { outcome: r.status, campaign_id: r.campaign_id },
+        `Campaign ${r.campaign_id} is a draft again.`,
+        resolveFormat(globals),
       )
     })
 

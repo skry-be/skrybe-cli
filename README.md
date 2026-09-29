@@ -47,6 +47,8 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe campaigns stats <id>` | Opens, clicks, bounces, complaints, unsubscribes, per-link clicks |
 | `skrybe campaigns create ...` | Create a campaign, optionally sending or scheduling it |
 | `skrybe campaigns send <id> --list <id>` | Send a draft now (`--dry-run` counts recipients, sends nothing) |
+| `skrybe campaigns schedule <id> --at <time> --list <id>` | Schedule a draft, or move a scheduled campaign (`--timezone`, `--dry-run`) |
+| `skrybe campaigns unschedule <id>` | Turn a scheduled campaign back into a draft |
 | `skrybe campaigns test <id> --to <email>` | Send a test to up to 5 addresses (20 requests an hour per brand) |
 | `skrybe emails send ...` | Send or schedule an email to addresses or lists |
 | `skrybe emails send-transactional ...` | Send one email immediately, bypassing the queue |
@@ -96,6 +98,22 @@ It asks before sending. From a script, where there is no one to answer, it
 refuses unless you pass `--yes`. Only a draft can be sent, so running it again
 after a dropped connection reports `campaign_not_draft` instead of sending a
 second time.
+
+### Scheduling
+
+`campaigns schedule` takes the same recipients as `send`, plus a time:
+
+```bash
+skrybe campaigns schedule 42 --list <list-id> --at '2027-06-15 18:05' --timezone Africa/Lagos
+# Schedule campaign 42 for 2027-06-15 18:05 Africa/Lagos to 1,204 recipients? [y/N]
+```
+
+The time is read in `--timezone`, or in the account's timezone if you leave it
+out, and must be in the future. Running it on a campaign that is already
+scheduled moves it. The recipients count against the brand's quota as soon as
+the campaign is scheduled. `campaigns unschedule` turns it back into a draft and
+gives that quota back. Like `send`, it asks before scheduling and needs `--yes`
+from a script.
 
 ### Test sends
 

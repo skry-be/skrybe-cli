@@ -160,7 +160,27 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
   'campaign is scheduled': {
     code: 'campaign_scheduled',
     exitCode: Exit.API_ERROR,
-    hint: 'Unschedule it in the Skrybe UI first, or leave it to send at its scheduled time.',
+    hint: 'Run `skrybe campaigns unschedule <id>` first, or leave it to send at its scheduled time.',
+  },
+  'campaign is not scheduled': { code: 'campaign_not_scheduled', exitCode: Exit.API_ERROR },
+  'campaign was changed by another request. try again.': { code: 'conflict', exitCode: Exit.API_ERROR },
+
+  // Scheduling (campaigns/schedule.php; the invalid-date wording is create.php's too)
+  'schedule_date_time not passed': { code: 'schedule_missing', exitCode: Exit.USAGE, hint: 'Pass --at.' },
+  'schedule_date_time is invalid': {
+    code: 'invalid_schedule',
+    exitCode: Exit.USAGE,
+    hint: 'Use a date and time such as "2027-06-15 18:05" or "June 15, 2027 6:05pm".',
+  },
+  'schedule_date_time is in the past': {
+    code: 'schedule_in_past',
+    exitCode: Exit.USAGE,
+    hint: 'The time is read in --timezone, or the account timezone if that is not given.',
+  },
+  'schedule_timezone is invalid': {
+    code: 'invalid_timezone',
+    exitCode: Exit.USAGE,
+    hint: 'Use an IANA name such as Africa/Lagos or America/New_York.',
   },
   // Test sends (campaigns/test-send.php, sharing its gates with the UI)
   'email addresses not passed': {

@@ -281,3 +281,59 @@ export async function testSendCampaign(
   })
   return parseJsonObject<TestSendResult>(body, 'test send result')
 }
+
+export interface ScheduleCampaignInput extends SendCampaignInput {
+  /** Anything PHP's strtotime() reads, e.g. "2027-06-15 18:05" or "June 15, 2027 6:05pm". */
+  at: string
+  /** e.g. "Africa/Lagos". Defaults to the account's timezone. */
+  timezone?: string
+}
+
+export interface ScheduleCampaignResult {
+  status: 'scheduled' | 'dry_run'
+  campaign_id: number
+  recipients: number
+  /** Unix seconds. */
+  scheduled_at: number
+  timezone: string
+}
+
+/**
+ * `api/campaigns/schedule.php` schedules a draft, or moves a scheduled
+ * campaign. The recipients are reserved against the quota now and handed back
+ * by `unscheduleCampaign`. Not retried: a repeat after a lost response can
+ * report a conflict for a schedule that succeeded.
+ */
+export async function scheduleCampaign(
+  client: SkrybeClient,
+  campaignId: number,
+  input: ScheduleCampaignInput,
+): Promise<ScheduleCampaignResult> {
+  const join = (ids?: string[]) => (ids && ids.length > 0 ? ids.join(',') : undefined)
+  const body = await client.requestText({
+    path: 'api/campaigns/schedule.php',
+    body: {
+      campaign_id: campaignId,
+      list_ids: join(input.listIds),
+      segment_ids: join(input.segmentIds),
+      exclude_list_ids: join(input.excludeListIds),
+      exclude_segment_ids: join(input.excludeSegmentIds),
+      schedule_date_time: input.at,
+      schedule_timezone: input.timezone,
+      dry_run: input.dryRun ? 1 : undefined,
+    },
+  })
+  return parseJsonObject<ScheduleCampaignResult>(body, 'schedule result')
+}
+
+/** `api/campaigns/unschedule.php`: back to a draft, with its quota reservation refunded. */
+export async function unscheduleCampaign(
+  client: SkrybeClient,
+  campaignId: number,
+): Promise<{ status: 'draft'; campaign_id: number }> {
+  const body = await client.requestText({
+    path: 'api/campaigns/unschedule.php',
+    body: { campaign_id: campaignId },
+  })
+  return parseJsonObject<{ status: 'draft'; campaign_id: number }>(body, 'unschedule result')
+}
