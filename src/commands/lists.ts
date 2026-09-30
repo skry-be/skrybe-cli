@@ -1,6 +1,8 @@
 import { Command, Option } from 'commander'
 
 import { UsageError } from '../api/errors.js'
+import { IMPORT_FORMAT_EXAMPLE } from '../api/parse.js'
+import { handleImportSubscribers } from './subscribers.js'
 import {
   activeSubscriberCount,
   createList,
@@ -184,6 +186,19 @@ export function listsCommand(getGlobals: () => GlobalOptions): Command {
 
       const r = await deleteList(client, listId)
       renderAction({ outcome: 'deleted', list_id: r.id }, `Deleted list ${listId}.`, resolveFormat(globals))
+    })
+
+  lists
+    .command('import <list-id> <path>')
+    .description('Import subscribers from a CSV, Excel (.xlsx, .xls), or text file into a list')
+    .option('--silent', 'Add to a double opt-in list without sending confirmation email')
+    .option('--gdpr', 'Record GDPR consent for an EU signup')
+    .addHelpText(
+      'after',
+      `\n${IMPORT_FORMAT_EXAMPLE}\n\nExamples:\n  skrybe lists import <list-id> ./contacts.xlsx\n  skrybe lists import <list-id> ~/Downloads/contacts.csv`,
+    )
+    .action(async (listId: string, path: string, options: { silent?: boolean; gdpr?: boolean }) => {
+      await handleImportSubscribers(getGlobals, path, { list: listId, silent: options.silent, gdpr: options.gdpr })
     })
 
   return lists

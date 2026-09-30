@@ -1,8 +1,14 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { ApiError } from '../src/api/errors.js'
-import { parseNumberedObject } from '../src/api/parse.js'
+import { unlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import XLSX from 'xlsx'
+
+import { ApiError, UsageError } from '../src/api/errors.js'
+import { parseNumberedObject, parseSubscriberFile } from '../src/api/parse.js'
 
 import { phpNumberedPayload } from './helpers.js'
 
@@ -145,5 +151,89 @@ describe('parseNumberedObject', () => {
         return true
       },
     )
+  })
+})
+
+describe('parseSubscriberFile', () => {
+  it('parses a CSV with headers and custom fields', () => {
+    const p = join(tmpdir(), `test-subs-${Date.now()}.csv`)
+    writeFileSync(p, 'Email,Name,Country\nada@example.com,Ada Lovelace,GB\ngrace@example.com,Grace Hopper,US\n')
+    try {
+      const rows = parseSubscriberFile(p)
+      assert.equal(rows.length, 2)
+      assert.deepEqual(rows[0], {
+        email: 'ada@example.com',
+        name: 'Ada Lovelace',
+        fields: { Country: 'GB' },
+      })
+      assert.deepEqual(rows[1], {
+        email: 'grace@example.com',
+        name: 'Grace Hopper',
+        fields: { Country: 'US' },
+      })
+    } finally {
+      unlinkSync(p)
+    }
+  })
+
+  it('parses a TXT list of plain emails', () => {
+    const p = join(tmpdir(), `test-subs-${Date.now()}.txt`)
+    writeFileSync(p, 'one@example.com\ntwo@example.com\n')
+    try {
+      const rows = parseSubscriberFile(p)
+      assert.equal(rows.length, 2)
+      assert.equal(rows[0]?.email, 'one@example.com')
+      assert.equal(rows[1]?.email, 'two@example.com')
+    } finally {
+      unlinkSync(p)
+    }
+  })
+
+  it('parses an Excel workbook (.xlsx)', () => {
+    const p = join(tmpdir(), `test-subs-${Date.now()}.xlsx`)
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Email', 'Name', 'City'],
+      ['margaret@example.com', 'Margaret Hamilton', 'Cambridge'],
+    ])
+    XLSX.utils.book_append_sheet(wb, ws, 'Subscribers')
+    XLSX.writeFile(wb, p)
+    try {
+      const rows = parseSubscriberFile(p)
+      assert.equal(rows.length, 1)
+      assert.deepEqual(rows[0], {
+        email: 'margaret@example.com',
+        name: 'Margaret Hamilton',
+        fields: { City: 'Cambridge' },
+      })
+    } finally {
+      unlinkSync(p)
+    }
+  })
+
+  it('throws UsageError on missing file or file without emails', () => {
+    assert.throws(
+      () => parseSubscriberFile('/nonexistent/path/never_existed.csv'),
+      (err: unknown) => {
+        assert.ok(err instanceof UsageError)
+        assert.match(err.message, /File not found/)
+        return true
+      },
+    )
+
+    const p = join(tmpdir(), `test-empty-${Date.now()}.csv`)
+    writeFileSync(p, 'Column1,Column2\nfoo,bar\n')
+    try {
+      assert.throws(
+        () => parseSubscriberFile(p),
+        (err: unknown) => {
+          assert.ok(err instanceof UsageError)
+          assert.match(err.message, /No valid subscriber rows found/)
+          return true
+        },
+      )
+    } finally {
+      unlinkSync(p)
+    }
   })
 })
