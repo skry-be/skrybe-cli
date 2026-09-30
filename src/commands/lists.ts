@@ -14,6 +14,7 @@ import {
 import { confirm } from '../input.js'
 import { info, renderAction, renderCollection, renderRecord, renderScalar, resolveFormat, warn } from '../output.js'
 import { clientFrom, type GlobalOptions } from './context.js'
+import { handleAddList } from './campaigns.js'
 
 const count = (n: number): string => n.toLocaleString('en-US')
 
@@ -184,6 +185,14 @@ export function listsCommand(getGlobals: () => GlobalOptions): Command {
 
       const r = await deleteList(client, listId)
       renderAction({ outcome: 'deleted', list_id: r.id }, `Deleted list ${listId}.`, resolveFormat(globals))
+    })
+
+  lists
+    .command('add-to-campaign <list-id> <campaign-id>')
+    .description('Attach this list to an existing campaign draft')
+    .option('--allow-empty', 'Allow attaching empty subscriber list')
+    .action(async (listId: string, campaignId: string, options: { allowEmpty?: boolean }) => {
+      await handleAddList(getGlobals, campaignId, listId, options)
     })
 
   return lists

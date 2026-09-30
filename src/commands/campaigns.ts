@@ -14,6 +14,7 @@ import {
   sendCampaign,
   testSendCampaign,
   unscheduleCampaign,
+  updateCampaign,
   type Campaign,
   type ScheduleCampaignResult,
   type CampaignStatus,
@@ -484,5 +485,125 @@ export function campaignsCommand(getGlobals: () => GlobalOptions): Command {
       )
     })
 
+  campaigns
+    .command('edit <campaign-id>')
+    .description('Edit a campaign draft (target lists)')
+    .option('--lists <list-ids>', 'Comma-separated recipient list IDs')
+    .option('--allow-empty', 'Allow attaching empty subscriber list')
+    .option('--subject <subject>', 'Email subject line (planned for next version)')
+    .option('--title <title>', 'Campaign title (planned for next version)')
+    .option('--from-name <name>', 'Sender from name (planned for next version)')
+    .option('--from-email <email>', 'Sender from email (planned for next version)')
+    .option('--reply-to <email>', 'Reply-to email (planned for next version)')
+    .option('--html <html|file://path>', 'HTML body (planned for next version)')
+    .option('--plain <text|file://path>', 'Plain text body (planned for next version)')
+    .action(async (id: string, options: EditOptions) => {
+      await handleEditCampaign(getGlobals, id, options)
+    })
+
+  campaigns
+    .command('add-list <campaign-id> <list-ids>')
+    .description('Append list(s) to a campaign draft with automatic deduplication')
+    .option('--allow-empty', 'Allow attaching empty subscriber list')
+    .action(async (id: string, listIds: string, options: { allowEmpty?: boolean }) => {
+      await handleAddList(getGlobals, id, listIds, options)
+    })
+
   return campaigns
+}
+
+interface EditOptions {
+  lists?: string
+  allowEmpty?: boolean
+  subject?: string
+  title?: string
+  fromName?: string
+  fromEmail?: string
+  replyTo?: string
+  html?: string
+  plain?: string
+}
+
+async function handleEditCampaign(
+  getGlobals: () => GlobalOptions,
+  id: string,
+  options: EditOptions,
+): Promise<void> {
+  const globals = getGlobals()
+  const format = resolveFormat(globals)
+  const client = clientFrom(globals)
+  const cid = campaignId(id)
+
+  const contentStubFields = [
+    options.subject && '--subject',
+    options.title && '--title',
+    options.fromName && '--from-name',
+    options.fromEmail && '--from-email',
+    options.replyTo && '--reply-to',
+    options.html && '--html',
+    options.plain && '--plain',
+  ].filter(Boolean)
+
+  if (contentStubFields.length > 0) {
+    warn(`Note: Content editing (${contentStubFields.join(', ')}) is planned for the next API version.`)
+    warn('List associations have been updated.')
+  }
+
+  if (options.lists === undefined && contentStubFields.length === 0) {
+    throw new UsageError('Nothing to update.', 'Pass --lists to update recipient lists.')
+  }
+
+  const listIds = options.lists !== undefined
+    ? options.lists.split(',').map((s) => s.trim()).filter(Boolean)
+    : undefined
+
+  const result = await updateCampaign(client, cid, {
+    listIds,
+    allowEmpty: options.allowEmpty,
+  })
+
+  renderAction(
+    {
+      outcome: 'updated',
+      campaign_id: cid,
+      to_send: result.campaign.to_send,
+      lists: result.campaign.lists,
+    },
+    `Campaign ${cid} updated: target lists set to [${result.campaign.lists}], ${count(result.campaign.to_send)} total recipients.`,
+    format,
+  )
+}
+
+export async function handleAddList(
+  getGlobals: () => GlobalOptions,
+  id: string,
+  newLists: string,
+  options: { allowEmpty?: boolean },
+): Promise<void> {
+  const globals = getGlobals()
+  const format = resolveFormat(globals)
+  const client = clientFrom(globals)
+  const cid = campaignId(id)
+
+  const current = await getCampaign(client, cid)
+  const existingListIds = (current.list_ids ?? []).map(String)
+
+  const incoming = newLists.split(',').map((s) => s.trim()).filter(Boolean)
+  const merged = Array.from(new Set([...existingListIds, ...incoming]))
+
+  const result = await updateCampaign(client, cid, {
+    listIds: merged,
+    allowEmpty: options.allowEmpty,
+  })
+
+  renderAction(
+    {
+      outcome: 'updated',
+      campaign_id: cid,
+      to_send: result.campaign.to_send,
+      lists: result.campaign.lists,
+    },
+    `Attached list(s) to campaign ${cid}: target lists now [${result.campaign.lists}], ${count(result.campaign.to_send)} total recipients.`,
+    format,
+  )
 }
