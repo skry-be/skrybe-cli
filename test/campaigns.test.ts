@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 
 import { SkrybeClient } from '../src/api/client.js'
 import { ApiError, Exit, UsageError } from '../src/api/errors.js'
-import { createCampaign } from '../src/api/resources/campaigns.js'
+import { createCampaign, updateCampaign } from '../src/api/resources/campaigns.js'
 import { MAX_RECIPIENTS, sendEmail, sendTransactional } from '../src/api/resources/emails.js'
 import { startStub } from './helpers.js'
 
@@ -190,3 +190,31 @@ describe('sendTransactional', () => {
     )
   })
 })
+
+describe('updateCampaign', () => {
+  it('posts campaign_id, list_ids, and allow_empty', async () => {
+    const stub = await startStub([
+      {
+        body: JSON.stringify({
+          status: true,
+          message: 'Campaign updated successfully',
+          campaign: { id: 42, to_send: 150, recipients: 150, lists: 'L1, L2' },
+        }),
+      },
+    ])
+    const client = new SkrybeClient({ url: stub.url, apiKey: KEY })
+
+    const result = await updateCampaign(client, 42, {
+      listIds: ['L1', 'L2'],
+      allowEmpty: true,
+    })
+
+    assert.equal(result.status, true)
+    assert.equal(result.campaign.id, 42)
+    assert.equal(result.campaign.to_send, 150)
+    assert.equal(stub.received[0]?.fields.campaign_id, '42')
+    assert.equal(stub.received[0]?.fields.list_ids, 'L1,L2')
+    assert.equal(stub.received[0]?.fields.allow_empty, '1')
+  })
+})
+
