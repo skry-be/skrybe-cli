@@ -14,7 +14,13 @@
  * That gives us a reliable structural anchor for the fallback parser.
  */
 
-import { ApiError, Exit, excerpt } from './errors.js'
+import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { extname, resolve } from 'node:path'
+
+import XLSX from 'xlsx'
+
+import { ApiError, Exit, UsageError, excerpt } from './errors.js'
 
 export interface NamedEntity {
   id: string
@@ -147,4 +153,145 @@ export function parseJsonObject<T>(body: string, what: string): T {
     Exit.API_ERROR,
     { raw: body, hint: `The server sent: ${excerpt(trimmed)}` },
   )
+}
+
+export interface ParsedSubscriberRow {
+  email: string
+  name?: string
+  fields?: Record<string, string>
+}
+
+export const IMPORT_FORMAT_EXAMPLE = `Expected Table Format:
+┌─────────────────────────┬──────────────┬───────────┐
+│ Email                   │ Name         │ Country   │
+├─────────────────────────┼──────────────┼───────────┤
+│ ada@example.com         │ Ada Lovelace │ GB        │
+│ grace@example.com       │ Grace Hopper │ US        │
+└─────────────────────────┴──────────────┴───────────┘
+Supported files: Excel (.xlsx, .xls), CSV (.csv), TSV (.tsv), Plain Text (.txt)`
+
+export function resolveFilePath(rawPath: string): string {
+  if (rawPath.startsWith('~/')) {
+    return resolve(homedir(), rawPath.slice(2))
+  }
+  return resolve(rawPath)
+}
+
+export function parseSubscriberFile(rawPath: string): ParsedSubscriberRow[] {
+  const filePath = resolveFilePath(rawPath)
+  if (!existsSync(filePath)) {
+    throw new UsageError(`File not found: ${filePath}`)
+  }
+
+  const ext = extname(filePath).toLowerCase()
+  const rows: ParsedSubscriberRow[] = []
+
+  if (ext === '.xlsx' || ext === '.xls') {
+    const workbook = XLSX.readFile(filePath)
+    const firstSheetName = workbook.SheetNames[0]
+    if (!firstSheetName) {
+      throw new UsageError(`Excel workbook has no sheets: ${filePath}`)
+    }
+    const sheet = workbook.Sheets[firstSheetName]
+    if (!sheet) {
+      throw new UsageError(`Sheet "${firstSheetName}" not found in workbook: ${filePath}`)
+    }
+    const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' })
+
+    for (const record of data) {
+      const keys = Object.keys(record)
+      let email = ''
+      let name = ''
+      const customFields: Record<string, string> = {}
+
+      for (const k of keys) {
+        const lower = k.trim().toLowerCase()
+        const val = String(record[k] ?? '').trim()
+        if (!val) continue
+
+        if (lower === 'email' || lower === 'e-mail' || lower === 'email_address' || lower === 'mail') {
+          email = val
+        } else if (lower === 'name' || lower === 'full_name' || lower === 'fullname' || lower === 'first_name') {
+          name = val
+        } else {
+          customFields[k.trim()] = val
+        }
+      }
+
+      if (email && email.includes('@')) {
+        rows.push({
+          email,
+          ...(name ? { name } : {}),
+          ...(Object.keys(customFields).length > 0 ? { fields: customFields } : {}),
+        })
+      }
+    }
+  } else {
+    // Delimited or plain text
+    const content = readFileSync(filePath, 'utf-8')
+    const lines = content.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+
+    const firstLine = lines[0]
+    if (!firstLine) {
+      throw new UsageError(`File is empty: ${filePath}`)
+    }
+
+    const isTsv = ext === '.tsv' || (!firstLine.includes(',') && firstLine.includes('\t'))
+    const delimiter = isTsv ? '\t' : ','
+    const firstCols = firstLine.split(delimiter).map((c) => c.replace(/^["']|["']$/g, '').trim())
+    const emailIndex = firstCols.findIndex((c) => {
+      const low = c.toLowerCase()
+      return low === 'email' || low === 'e-mail' || low === 'mail'
+    })
+
+    if (emailIndex !== -1) {
+      const nameIndex = firstCols.findIndex((c) => {
+        const low = c.toLowerCase()
+        return low === 'name' || low === 'full_name' || low === 'fullname' || low === 'first_name'
+      })
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i]
+        if (!line) continue
+        const cols = line.split(delimiter).map((c) => c.replace(/^["']|["']$/g, '').trim())
+        const email = cols[emailIndex] ?? ''
+        const name = nameIndex !== -1 ? (cols[nameIndex] ?? '') : ''
+        const customFields: Record<string, string> = {}
+
+        firstCols.forEach((colName, idx) => {
+          if (idx !== emailIndex && idx !== nameIndex && cols[idx]) {
+            customFields[colName] = cols[idx]
+          }
+        })
+
+        if (email && email.includes('@')) {
+          rows.push({
+            email,
+            ...(name ? { name } : {}),
+            ...(Object.keys(customFields).length > 0 ? { fields: customFields } : {}),
+          })
+        }
+      }
+    } else {
+      for (const line of lines) {
+        const parts = line.split(/[,\t]/).map((p) => p.replace(/^["']|["']$/g, '').trim())
+        const foundEmail = parts.find((p) => p.includes('@'))
+        if (foundEmail) {
+          const name = parts.find((p) => p !== foundEmail && p.length > 0)
+          rows.push({
+            email: foundEmail,
+            ...(name ? { name } : {}),
+          })
+        }
+      }
+    }
+  }
+
+  if (rows.length === 0) {
+    throw new UsageError(
+      `No valid subscriber rows found in ${filePath}.\n\n${IMPORT_FORMAT_EXAMPLE}`,
+    )
+  }
+
+  return rows
 }

@@ -337,3 +337,38 @@ export async function unscheduleCampaign(
   })
   return parseJsonObject<{ status: 'draft'; campaign_id: number }>(body, 'unschedule result')
 }
+
+export interface UpdateCampaignInput {
+  listIds?: string[]
+  allowEmpty?: boolean
+}
+
+export interface UpdateCampaignResult {
+  status: boolean
+  message: string
+  campaign: {
+    id: number
+    to_send: number
+    recipients: number
+    lists: string
+  }
+}
+
+/** `api/campaigns/update.php`: update target lists and recalculate recipients. */
+export async function updateCampaign(
+  client: SkrybeClient,
+  campaignId: number,
+  input: UpdateCampaignInput,
+): Promise<UpdateCampaignResult> {
+  const body: Record<string, string | number | undefined> = {
+    campaign_id: campaignId,
+    list_ids: input.listIds?.join(','),
+  }
+  if (input.allowEmpty) body.allow_empty = 1
+
+  const text = await client.requestText({
+    path: 'api/campaigns/update.php',
+    body,
+  })
+  return parseJsonObject<UpdateCampaignResult>(text, 'update result')
+}
