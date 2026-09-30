@@ -1,6 +1,7 @@
 import { Command, Option } from 'commander'
 
 import { UsageError } from '../api/errors.js'
+import { IMPORT_FORMAT_EXAMPLE, parseSubscriberFile } from '../api/parse.js'
 import {
   MAX_SUBSCRIBERS_PAGE,
   SUBSCRIBER_STATUSES,
@@ -14,7 +15,7 @@ import {
   type SubscriberStatus,
 } from '../api/resources/subscribers.js'
 import { parseFields } from '../input.js'
-import { info, renderAction, renderCollection, renderScalar, resolveFormat, when } from '../output.js'
+import { bold, dim, green, info, red, renderAction, renderCollection, renderScalar, resolveFormat, when } from '../output.js'
 import { clientFrom, type GlobalOptions } from './context.js'
 
 interface AddOptions {
@@ -197,5 +198,93 @@ export function subscribersCommand(getGlobals: () => GlobalOptions): Command {
       renderScalar(status, { email, list_id: options.list, status }, resolveFormat(globals))
     })
 
+  subscribers
+    .command('import <path>')
+    .description('Import subscribers from a CSV, Excel (.xlsx, .xls), or text file into a list')
+    .requiredOption('--list <list-id>', 'List ID, as shown by `skrybe lists`')
+    .option('--silent', 'Add to a double opt-in list without sending confirmation email')
+    .option('--gdpr', 'Record GDPR consent for an EU signup')
+    .addHelpText(
+      'after',
+      `\n${IMPORT_FORMAT_EXAMPLE}\n\nExamples:\n  skrybe subscribers import ./contacts.xlsx --list <list-id>\n  skrybe subscribers import ~/Downloads/contacts.csv --list <list-id>`,
+    )
+    .action(async (path: string, options: ImportOptions) => {
+      await handleImportSubscribers(getGlobals, path, options)
+    })
+
   return subscribers
+}
+
+export interface ImportOptions {
+  list: string
+  silent?: boolean
+  gdpr?: boolean
+}
+
+export async function handleImportSubscribers(
+  getGlobals: () => GlobalOptions,
+  filePath: string,
+  options: ImportOptions,
+): Promise<void> {
+  const globals = getGlobals()
+  const format = resolveFormat(globals)
+  const client = clientFrom(globals)
+
+  const rows = parseSubscriberFile(filePath)
+
+  let added = 0
+  let alreadySubscribed = 0
+  let failed = 0
+  const errors: { email: string; error: string }[] = []
+
+  for (const row of rows) {
+    try {
+      const outcome = await subscribe(client, {
+        listId: options.list,
+        email: row.email,
+        name: row.name,
+        fields: row.fields,
+        silent: options.silent,
+        gdpr: options.gdpr,
+      })
+      if (outcome === 'subscribed') {
+        added++
+      } else if (outcome === 'already_subscribed') {
+        alreadySubscribed++
+      }
+    } catch (err: unknown) {
+      failed++
+      const message = err instanceof Error ? err.message : String(err)
+      errors.push({ email: row.email, error: message })
+    }
+  }
+
+  const resultRecord = {
+    list_id: options.list,
+    file: filePath,
+    total_processed: rows.length,
+    added,
+    already_subscribed: alreadySubscribed,
+    failed,
+    errors: errors.slice(0, 10),
+  }
+
+  if (format === 'table') {
+    info(`Import completed for list ${bold(options.list)}:`)
+    info(`  ${green('✓')} Added:              ${added}`)
+    if (alreadySubscribed > 0) {
+      info(`  ${dim('-')} Already subscribed: ${alreadySubscribed}`)
+    }
+    if (failed > 0) {
+      info(`  ${red('✗')} Failed:             ${failed}`)
+      for (const e of errors.slice(0, 5)) {
+        info(`    • ${e.email}: ${e.error}`)
+      }
+      if (errors.length > 5) {
+        info(`    ...and ${errors.length - 5} more`)
+      }
+    }
+  } else {
+    renderAction(resultRecord, `Imported ${added} subscribers.`, format)
+  }
 }
