@@ -112,7 +112,9 @@ export function listsCommand(getGlobals: () => GlobalOptions): Command {
     .description('Show the subscriber lists for the current brand')
     .option('--include-hidden', 'Include lists hidden in the UI')
     .option('--counts', 'Also fetch active subscriber counts (one request per list)')
-    .action((options: ListOptions) => showLists(getGlobals, options))
+    .action((_options: ListOptions, command: Command) =>
+      showLists(getGlobals, command.optsWithGlobals<ListOptions>()),
+    )
 
   lists
     .command('count <list-id>')
