@@ -140,4 +140,22 @@ describe('skrybe lists create / update / delete (CLI)', () => {
     assert.equal(stub.received[0]?.path, '/api/lists/delete.php')
     assert.deepEqual(JSON.parse(stdout), { outcome: 'deleted', list_id: 'enc892id' })
   })
+
+  it('ls --counts passes counts flag through Commander options inheritance', async () => {
+    const stub = await startStub((req) => {
+      if (req.path === '/api/lists/get-lists.php') {
+        return { body: '{"list1":{"id":"L1","name":"Newsletter"}}' }
+      }
+      if (req.path === '/api/subscribers/active-subscriber-count.php') {
+        return { body: '42' }
+      }
+      return { body: '' }
+    })
+
+    const { stdout } = await run(stub.url, 'lists', 'ls', '--counts')
+
+    assert.match(stdout, /ACTIVE/)
+    assert.match(stdout, /42/)
+  })
 })
+
