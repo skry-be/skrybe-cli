@@ -36,8 +36,17 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe lists` | Subscriber lists for the current brand |
 | `skrybe lists --counts` | ...with active subscriber counts (one request per list) |
 | `skrybe lists count <id>` | Active subscriber count for one list |
+| `skrybe lists get <id>` | One list, with subscribers counted by state |
+| `skrybe lists create <name>` | Create a list (`--opt-in double`); prints the new id |
+| `skrybe lists update <id>` | Rename a list (`--name`) or switch its `--opt-in` |
+| `skrybe lists fields <id>` | A list's custom fields, with their personalization tags |
+| `skrybe lists fields add <id> <name>` | Add a custom field (`--type date`) |
+| `skrybe lists fields rename <id> <name> <new>` | Rename a field; autoresponders and segments using it follow |
+| `skrybe lists fields delete <id> <name>` | Delete a field and its values (asks first; `--yes` in scripts) |
+| `skrybe lists delete <id>` | Delete a list and its subscribers (asks first; `--yes` in scripts) |
 | `skrybe brands` | Brands visible to the current key |
 | `skrybe whoami` | Show the active profile and its brand |
+| `skrybe subscribers ls --list <id>` | A list's subscribers, oldest first (`--status`, `--page`, `--limit`, `--all`) |
 | `skrybe subscribers add <email> --list <id>` | Add a subscriber, or update one already on the list |
 | `skrybe subscribers status <email> --list <id>` | Subscribed, Unsubscribed, Bounced, Complained... |
 | `skrybe subscribers unsubscribe <email> --list <id>` | Unsubscribe, keeping the record |
@@ -45,8 +54,14 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe campaigns` | Campaigns, newest first (`--status`, `--page`, `--limit`, `--all`) |
 | `skrybe campaigns get <id>` | One campaign's details; `--content` prints its HTML |
 | `skrybe campaigns stats <id>` | Opens, clicks, bounces, complaints, unsubscribes, per-link clicks |
+| `skrybe campaigns update <id> --subject ...` | Edit a draft or scheduled campaign; only the fields given change |
+| `skrybe campaigns duplicate <id>` | Copy a campaign into a new draft (`--title`); prints the new id |
+| `skrybe campaigns delete <id>` | Delete a campaign (asks first; `--yes` in scripts). A sent one loses its report |
 | `skrybe campaigns create ...` | Create a campaign, optionally sending or scheduling it |
 | `skrybe campaigns send <id> --list <id>` | Send a draft now (`--dry-run` counts recipients, sends nothing) |
+| `skrybe campaigns schedule <id> --at <time> --list <id>` | Schedule a draft, or move a scheduled campaign (`--timezone`, `--dry-run`) |
+| `skrybe campaigns unschedule <id>` | Turn a scheduled campaign back into a draft |
+| `skrybe campaigns test <id> --to <email>` | Send a test to up to 5 addresses (20 requests an hour per brand) |
 | `skrybe emails send ...` | Send or schedule an email to addresses or lists |
 | `skrybe emails send-transactional ...` | Send one email immediately, bypassing the queue |
 | `skrybe auth login` | Store an API key for an install |
@@ -57,8 +72,8 @@ A bare resource name shows the collection — the common case needs no verb.
 
 `ls` works as an explicit alias everywhere (`skrybe lists ls`).
 
-Commands the HTTP API cannot serve yet — `campaigns stop`, `lists create` and
-friends — are registered so they fail with an explanation rather than "unknown
+Commands the HTTP API cannot serve yet — `campaigns stop` and `campaigns
+resume` — are registered so they fail with an explanation rather than "unknown
 command". The API is gaining them one endpoint at a time.
 
 ### Passing a body from a file
@@ -96,10 +111,54 @@ refuses unless you pass `--yes`. Only a draft can be sent, so running it again
 after a dropped connection reports `campaign_not_draft` instead of sending a
 second time.
 
+### Scheduling
+
+`campaigns schedule` takes the same recipients as `send`, plus a time:
+
+```bash
+skrybe campaigns schedule 42 --list <list-id> --at '2027-06-15 18:05' --timezone Africa/Lagos
+# Schedule campaign 42 for 2027-06-15 18:05 Africa/Lagos to 1,204 recipients? [y/N]
+```
+
+The time is read in `--timezone`, or in the account's timezone if you leave it
+out, and must be in the future. Running it on a campaign that is already
+scheduled moves it. The recipients count against the brand's quota as soon as
+the campaign is scheduled. `campaigns unschedule` turns it back into a draft and
+gives that quota back. Like `send`, it asks before scheduling and needs `--yes`
+from a script.
+
+### Test sends
+
+`campaigns test` sends a campaign to a few addresses before it goes to a list:
+
+```bash
+skrybe campaigns test 42 --to ada@example.com --to team@example.com
+```
+
+It sends to at most 5 addresses per call. Each brand gets 20 test sends an
+hour, shared with the test-send box in the Skrybe UI. It exits `1` if any
+address fails, and `--json` shows the result for each address.
+
+### Exporting a list
+
+`subscribers ls` pages through a list, oldest first. Each subscriber is in
+exactly one state: `active`, `unconfirmed`, `unsubscribed`, `bounced` or
+`complained`. `active` is who a campaign sends to.
+
+```bash
+skrybe subscribers ls --list <id> --status active --all --output text > active.tsv
+skrybe subscribers ls --list <id> --all --json | jq '.[] | {email, city: .custom_fields.City}'
+```
+
+`--output text` gives email, name, status and join time, tab-separated.
+`--json` adds each subscriber's custom fields by name, with dates as
+`YYYY-MM-DD`.
+
 ### Custom fields
 
 `subscribers add` sets custom fields by their personalization tag name — the
-`Birthday` in `[Birthday,fallback=]`:
+`Birthday` in `[Birthday,fallback=]`. `skrybe lists fields <list-id>` shows a
+list's fields, and `lists fields add` creates one:
 
 ```bash
 skrybe subscribers add ada@example.com --list <id> \
