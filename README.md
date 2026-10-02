@@ -39,6 +39,10 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe lists get <id>` | One list, with subscribers counted by state |
 | `skrybe lists create <name>` | Create a list (`--opt-in double`); prints the new id |
 | `skrybe lists update <id>` | Rename a list (`--name`) or switch its `--opt-in` |
+| `skrybe lists fields <id>` | A list's custom fields, with their personalization tags |
+| `skrybe lists fields add <id> <name>` | Add a custom field (`--type date`) |
+| `skrybe lists fields rename <id> <name> <new>` | Rename a field; autoresponders and segments using it follow |
+| `skrybe lists fields delete <id> <name>` | Delete a field and its values (asks first; `--yes` in scripts) |
 | `skrybe lists delete <id>` | Delete a list and its subscribers (asks first; `--yes` in scripts) |
 | `skrybe brands` | Brands visible to the current key |
 | `skrybe whoami` | Show the active profile and its brand |
@@ -153,7 +157,8 @@ skrybe subscribers ls --list <id> --all --json | jq '.[] | {email, city: .custom
 ### Custom fields
 
 `subscribers add` sets custom fields by their personalization tag name — the
-`Birthday` in `[Birthday,fallback=]`:
+`Birthday` in `[Birthday,fallback=]`. `skrybe lists fields <list-id>` shows a
+list's fields, and `lists fields add` creates one:
 
 ```bash
 skrybe subscribers add ada@example.com --list <id> \

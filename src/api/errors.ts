@@ -146,6 +146,33 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
     hint: 'Unschedule the campaign, or wait for it to finish sending, then delete the list.',
   },
 
+  // Custom fields (lists/add-custom-field.php, rename-custom-field.php, delete-custom-field.php)
+  'field name not passed': { code: 'field_name_missing', exitCode: Exit.USAGE },
+  'invalid field name': {
+    code: 'invalid_field_name',
+    exitCode: Exit.USAGE,
+    hint: 'Up to 100 characters, without : % [ ] , " < or >.',
+  },
+  'name and email are built-in fields': { code: 'reserved_field_name', exitCode: Exit.USAGE },
+  'type must be text or date': { code: 'invalid_field_type', exitCode: Exit.USAGE },
+  'field already exists': { code: 'field_exists', exitCode: Exit.API_ERROR, hint: 'Field names are case-insensitive.' },
+  'field does not exist': {
+    code: 'field_not_found',
+    exitCode: Exit.API_ERROR,
+    hint: 'Run `skrybe lists fields <list-id>` to see the fields.',
+  },
+  'field is used by an autoresponder': {
+    code: 'field_in_use',
+    exitCode: Exit.API_ERROR,
+    hint: 'Change the autoresponder in the Skrybe UI first.',
+  },
+  'field is used by a segment': {
+    code: 'field_in_use',
+    exitCode: Exit.API_ERROR,
+    hint: 'Remove it from the segment in the Skrybe UI first.',
+  },
+  'list was changed by another request. try again.': { code: 'conflict', exitCode: Exit.API_ERROR },
+
   // Campaigns (get-campaigns.php, get-campaign.php, stats.php)
   'campaign id not passed': { code: 'campaign_id_missing', exitCode: Exit.USAGE },
   'campaign does not exist': {

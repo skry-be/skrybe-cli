@@ -3,11 +3,16 @@ import { Command, Option } from 'commander'
 import { UsageError } from '../api/errors.js'
 import {
   activeSubscriberCount,
+  addCustomField,
   createList,
+  deleteCustomField,
   deleteList,
   getList,
   listLists,
+  renameCustomField,
   updateList,
+  type CustomField,
+  type CustomFieldType,
   type ListDetail,
   type OptIn,
 } from '../api/resources/lists.js'
@@ -19,6 +24,19 @@ const count = (n: number): string => n.toLocaleString('en-US')
 
 const optInOption = () =>
   new Option('--opt-in <mode>', 'single, or double to email a confirmation link first').choices(['single', 'double'])
+
+function showFields(list: ListDetail, format: ReturnType<typeof resolveFormat>): void {
+  renderCollection<CustomField>(
+    list.custom_fields,
+    [
+      { header: 'NAME', value: (f) => f.name },
+      { header: 'TYPE', value: (f) => f.type.toLowerCase() },
+      { header: 'TAG', value: (f) => `[${f.name},fallback=]` },
+    ],
+    format,
+    `List "${list.name}" has no custom fields. Add one with \`skrybe lists fields add <list-id> <name>\`.`,
+  )
+}
 
 function showList(list: ListDetail, format: ReturnType<typeof resolveFormat>): void {
   const s = list.subscribers
@@ -33,6 +51,7 @@ function showList(list: ListDetail, format: ReturnType<typeof resolveFormat>): v
       ['Unsubscribed', count(s.unsubscribed)],
       ['Bounced', count(s.bounced)],
       ['Complained', count(s.complained)],
+      ['Custom fields', list.custom_fields.length ? list.custom_fields.map((f) => `${f.name} (${f.type.toLowerCase()})`).join(', ') : '-'],
     ],
     format,
   )
@@ -184,6 +203,70 @@ export function listsCommand(getGlobals: () => GlobalOptions): Command {
 
       const r = await deleteList(client, listId)
       renderAction({ outcome: 'deleted', list_id: r.id }, `Deleted list ${listId}.`, resolveFormat(globals))
+    })
+
+  // `skrybe lists fields <list-id>` shows them; add/rename/delete dispatch as sub-verbs.
+  const fields = lists
+    .command('fields')
+    .argument('[list-id]')
+    .description("A list's custom fields — run with a list ID to show them")
+    .action(async (listId: string | undefined) => {
+      if (!listId) throw new UsageError('Which list?', 'Run `skrybe lists fields <list-id>`; `skrybe lists` shows the IDs.')
+      const globals = getGlobals()
+      showFields(await getList(clientFrom(globals), listId), resolveFormat(globals))
+    })
+
+  fields
+    .command('add <list-id> <name>')
+    .description('Add a custom field; every subscriber gets an empty value for it')
+    .addOption(new Option('--type <type>', 'text (default) or date').choices(['text', 'date']))
+    .action(async (listId: string, name: string, options: { type?: CustomFieldType }) => {
+      const globals = getGlobals()
+      const format = resolveFormat(globals)
+      const list = await addCustomField(clientFrom(globals), listId, name, options.type)
+      if (format === 'table') info(`Added "${name}" to list "${list.name}". Use it in emails as [${name},fallback=].`)
+      else showFields(list, format)
+    })
+
+  fields
+    .command('rename <list-id> <name> <new-name>')
+    .description('Rename a custom field, keeping its values')
+    .action(async (listId: string, name: string, newName: string) => {
+      const globals = getGlobals()
+      const format = resolveFormat(globals)
+      const list = await renameCustomField(clientFrom(globals), listId, name, newName)
+      if (format === 'table') {
+        info(`Renamed "${name}" to "${newName}". Autoresponders and segments using it were updated;`)
+        info(`[${name},fallback=] tags already in campaigns and templates were not.`)
+      } else showFields(list, format)
+    })
+
+  fields
+    .command('delete <list-id> <name>')
+    .alias('rm')
+    .description("Delete a custom field and every subscriber's value for it")
+    .option('-y, --yes', 'Delete without asking for confirmation (required when not run interactively)')
+    .action(async (listId: string, name: string, options: { yes?: boolean }) => {
+      const globals = getGlobals()
+      const client = clientFrom(globals)
+
+      if (!options.yes) {
+        if (!process.stdin.isTTY) {
+          throw new UsageError('Refusing to delete without confirmation.', 'Pass --yes to delete from a script.')
+        }
+        const list = await getList(client, listId)
+        const total = Object.values(list.subscribers).reduce((a, b) => a + b, 0)
+        const question = `Delete "${name}" from list "${list.name}", with its values for ${count(total)} subscribers? This cannot be undone.`
+        if (!(await confirm(question))) {
+          info('Not deleted.')
+          return
+        }
+      }
+
+      const format = resolveFormat(globals)
+      const list = await deleteCustomField(client, listId, name)
+      if (format === 'table') info(`Deleted "${name}" from list "${list.name}".`)
+      else showFields(list, format)
     })
 
   return lists

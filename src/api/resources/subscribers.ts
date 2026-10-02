@@ -22,6 +22,10 @@ export interface SubscribeInput extends SubscriberRef {
    * whose tag is `[Birthday,fallback=]`. They go in as ordinary POST fields
    * alongside the documented ones, so a field named `email` or `list` would
    * collide; the documented names are written last and win.
+   *
+   * subscribe.php matches a field by its name with the spaces taken out (and
+   * PHP would turn a space in a POST key into `_` anyway), so `Favourite colour`
+   * is posted as `Favouritecolour`. Callers pass the name as the list shows it.
    */
   fields?: Record<string, string>
 }
@@ -41,7 +45,8 @@ export async function subscribe(
   client: SkrybeClient,
   input: SubscribeInput,
 ): Promise<SubscribeOutcome> {
-  const body: Record<string, string> = { ...(input.fields ?? {}) }
+  const body: Record<string, string> = {}
+  for (const [name, value] of Object.entries(input.fields ?? {})) body[name.replace(/ /g, '')] = value
 
   body.email = input.email
   body.list = input.listId

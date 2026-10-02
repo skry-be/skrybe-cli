@@ -19,6 +19,7 @@ const list = (overrides: Partial<ListDetail> = {}): ListDetail => ({
   name: 'Newsletter',
   opt_in: 'single',
   subscribers: { active: 1204, unconfirmed: 3, unsubscribed: 40, bounced: 2, complained: 1 },
+  custom_fields: [],
   ...overrides,
 })
 

@@ -64,6 +64,17 @@ export interface ListDetail extends List {
   opt_in: OptIn
   /** `active` is who a campaign goes to: confirmed, and not unsubscribed, bounced or complained. */
   subscribers: { active: number; unconfirmed: number; unsubscribed: number; bounced: number; complained: number }
+  /** In the order subscribers' values are stored. */
+  custom_fields: CustomField[]
+}
+
+export type CustomFieldType = 'text' | 'date'
+
+export interface CustomField {
+  /** As used in personalization tags: [Name,fallback=]. */
+  name: string
+  /** As the API stores it. */
+  type: 'Text' | 'Date'
 }
 
 export async function getList(client: SkrybeClient, listId: string): Promise<ListDetail> {
@@ -96,4 +107,38 @@ export async function updateList(
 export async function deleteList(client: SkrybeClient, listId: string): Promise<{ id: string; deleted: true }> {
   const body = await client.requestText({ path: 'api/lists/delete.php', body: { list_id: listId } })
   return parseJsonObject<{ id: string; deleted: true }>(body, 'delete result')
+}
+
+/** Adds a field; every subscriber gets an empty value for it. Returns the list with its fields. */
+export async function addCustomField(
+  client: SkrybeClient,
+  listId: string,
+  name: string,
+  type?: CustomFieldType,
+): Promise<ListDetail> {
+  const body = await client.requestText({ path: 'api/lists/add-custom-field.php', body: { list_id: listId, name, type } })
+  return parseJsonObject<ListDetail>(body, 'list')
+}
+
+/**
+ * Renames a field, keeping subscribers' values. The autoresponders and segment
+ * conditions that use it follow; tags already in campaigns keep the old name.
+ */
+export async function renameCustomField(
+  client: SkrybeClient,
+  listId: string,
+  name: string,
+  newName: string,
+): Promise<ListDetail> {
+  const body = await client.requestText({
+    path: 'api/lists/rename-custom-field.php',
+    body: { list_id: listId, name, new_name: newName },
+  })
+  return parseJsonObject<ListDetail>(body, 'list')
+}
+
+/** Deletes a field and every subscriber's value for it. Refused while an autoresponder or segment uses it. */
+export async function deleteCustomField(client: SkrybeClient, listId: string, name: string): Promise<ListDetail> {
+  const body = await client.requestText({ path: 'api/lists/delete-custom-field.php', body: { list_id: listId, name } })
+  return parseJsonObject<ListDetail>(body, 'list')
 }
