@@ -337,3 +337,74 @@ export async function unscheduleCampaign(
   })
   return parseJsonObject<{ status: 'draft'; campaign_id: number }>(body, 'unschedule result')
 }
+
+/** Fields `updateCampaign` can change. Names follow `CampaignInput`. */
+export interface CampaignChanges {
+  title?: string
+  subject?: string
+  preheader?: string
+  fromName?: string
+  fromEmail?: string
+  replyTo?: string
+  htmlText?: string
+  plainText?: string
+  queryString?: string
+  /** 0 off, 1 on, 2 anonymous. */
+  trackOpens?: number
+  trackClicks?: number
+}
+
+/**
+ * `api/campaigns/update-campaign.php` edits a draft or scheduled campaign and
+ * returns it as `getCampaign` would. Only the fields given change.
+ */
+export async function updateCampaign(
+  client: SkrybeClient,
+  campaignId: number,
+  changes: CampaignChanges,
+): Promise<CampaignDetail> {
+  const body = await client.requestText({
+    path: 'api/campaigns/update-campaign.php',
+    body: {
+      campaign_id: campaignId,
+      title: changes.title,
+      subject: changes.subject,
+      preheader: changes.preheader,
+      from_name: changes.fromName,
+      from_email: changes.fromEmail,
+      reply_to: changes.replyTo,
+      html_text: changes.htmlText,
+      plain_text: changes.plainText,
+      query_string: changes.queryString,
+      track_opens: changes.trackOpens,
+      track_clicks: changes.trackClicks,
+    },
+  })
+  return parseJsonObject<CampaignDetail>(body, 'campaign')
+}
+
+/** A new draft copied from the campaign, in the same brand. Not retried: a repeat would copy twice. */
+export async function duplicateCampaign(
+  client: SkrybeClient,
+  campaignId: number,
+  title?: string,
+): Promise<CampaignDetail> {
+  const body = await client.requestText({
+    path: 'api/campaigns/duplicate-campaign.php',
+    body: { campaign_id: campaignId, title },
+  })
+  return parseJsonObject<CampaignDetail>(body, 'campaign')
+}
+
+/**
+ * Deletes the campaign with its links and attachments; a sent one loses its
+ * report. A scheduled campaign's quota reservation is refunded. The API
+ * refuses a campaign that is preparing or sending.
+ */
+export async function deleteCampaign(
+  client: SkrybeClient,
+  campaignId: number,
+): Promise<{ campaign_id: number; deleted: true }> {
+  const body = await client.requestText({ path: 'api/campaigns/delete-campaign.php', body: { campaign_id: campaignId } })
+  return parseJsonObject<{ campaign_id: number; deleted: true }>(body, 'delete result')
+}

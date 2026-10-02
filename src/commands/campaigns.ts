@@ -7,6 +7,8 @@ import {
   MAX_TEST_EMAILS,
   campaignStats,
   createCampaign,
+  deleteCampaign,
+  duplicateCampaign,
   getCampaign,
   listAllCampaigns,
   listCampaigns,
@@ -14,7 +16,9 @@ import {
   sendCampaign,
   testSendCampaign,
   unscheduleCampaign,
+  updateCampaign,
   type Campaign,
+  type CampaignDetail,
   type ScheduleCampaignResult,
   type CampaignStatus,
 } from '../api/resources/campaigns.js'
@@ -196,6 +200,47 @@ async function showCampaigns(getGlobals: () => GlobalOptions, options: ListOptio
   )
 }
 
+/** `campaigns get`'s view of a campaign, shared with `update` and `duplicate`. */
+function showCampaign(c: CampaignDetail, format: ReturnType<typeof resolveFormat>): void {
+  const lists = (ids: (string | number)[]) => (ids.length ? ids.join(', ') : '-')
+  renderRecord(
+    c,
+    [
+      ['ID', String(c.id)],
+      ['Title', c.title],
+      ['Subject', c.subject],
+      ['Status', c.status],
+      ['From', `${c.from_name} <${c.from_email}>`],
+      ['Reply to', c.reply_to],
+      ['Recipients', `${count(c.recipients)} of ${count(c.to_send)}`],
+      ['Sent', when(c.sent_at)],
+      ...(c.scheduled_at !== null
+        ? [['Scheduled', c.timezone ? whenIn(c.scheduled_at, c.timezone) : when(c.scheduled_at)] as [string, string]]
+        : []),
+      ['Lists', lists(c.list_ids)],
+      ['Excluded lists', lists(c.exclude_list_ids)],
+      ['Segments', lists(c.segment_ids)],
+      ['Excluded segments', lists(c.exclude_segment_ids)],
+      ['Web version', c.web_version],
+    ],
+    format,
+  )
+}
+
+interface UpdateOptions {
+  title?: string
+  subject?: string
+  preheader?: string
+  fromName?: string
+  fromEmail?: string
+  replyTo?: string
+  htmlText?: string
+  plainText?: string
+  queryString?: string
+  trackOpens?: string
+  trackClicks?: string
+}
+
 /** `--track-opens 2` etc. Commander hands options over as strings. */
 const tracking = (value: string | undefined): number | undefined =>
   value === undefined ? undefined : Number(value)
@@ -232,29 +277,7 @@ export function campaignsCommand(getGlobals: () => GlobalOptions): Command {
         return
       }
 
-      const lists = (ids: (string | number)[]) => (ids.length ? ids.join(', ') : '-')
-      renderRecord(
-        c,
-        [
-          ['ID', String(c.id)],
-          ['Title', c.title],
-          ['Subject', c.subject],
-          ['Status', c.status],
-          ['From', `${c.from_name} <${c.from_email}>`],
-          ['Reply to', c.reply_to],
-          ['Recipients', `${count(c.recipients)} of ${count(c.to_send)}`],
-          ['Sent', when(c.sent_at)],
-          ...(c.scheduled_at !== null
-            ? [['Scheduled', c.timezone ? whenIn(c.scheduled_at, c.timezone) : when(c.scheduled_at)] as [string, string]]
-            : []),
-          ['Lists', lists(c.list_ids)],
-          ['Excluded lists', lists(c.exclude_list_ids)],
-          ['Segments', lists(c.segment_ids)],
-          ['Excluded segments', lists(c.exclude_segment_ids)],
-          ['Web version', c.web_version],
-        ],
-        format,
-      )
+      showCampaign(c, format)
     })
 
   campaigns
@@ -427,6 +450,87 @@ export function campaignsCommand(getGlobals: () => GlobalOptions): Command {
           Exit.API_ERROR,
         )
       }
+    })
+
+  campaigns
+    .command('update <campaign-id>')
+    .description('Edit a draft or scheduled campaign; only the fields given change')
+    .option('--title <title>', 'Campaign title, shown in the dashboard')
+    .option('--subject <subject>', 'Subject line')
+    .option('--preheader <text>', 'Preview text shown after the subject in the inbox')
+    .option('--from-name <name>', "The 'From' name")
+    .option('--from-email <email>', "The 'From' address")
+    .option('--reply-to <email>', "The 'Reply to' address")
+    .option('--html-text <html|file://path>', 'HTML body, or file:// a path to it')
+    .option('--plain-text <text|file://path>', 'Plain text body, or file:// a path to it')
+    .option('--query-string <query>', 'Appended to links, e.g. Google Analytics tags')
+    .addOption(new Option('--track-opens <mode>', '0 off, 1 on, 2 anonymous').choices(['0', '1', '2']))
+    .addOption(new Option('--track-clicks <mode>', '0 off, 1 on, 2 anonymous').choices(['0', '1', '2']))
+    .action(async (id: string, options: UpdateOptions) => {
+      const changes = {
+        title: options.title,
+        subject: options.subject,
+        preheader: options.preheader,
+        fromName: options.fromName,
+        fromEmail: options.fromEmail,
+        replyTo: options.replyTo,
+        htmlText: resolveOptionalArg(options.htmlText, '--html-text'),
+        plainText: resolveOptionalArg(options.plainText, '--plain-text'),
+        queryString: options.queryString,
+        trackOpens: tracking(options.trackOpens),
+        trackClicks: tracking(options.trackClicks),
+      }
+      if (Object.values(changes).every((v) => v === undefined)) {
+        throw new UsageError('Nothing to update.', 'Pass at least one field to change, e.g. --subject.')
+      }
+      const globals = getGlobals()
+      const format = resolveFormat(globals)
+      const c = await updateCampaign(clientFrom(globals), campaignId(id), changes)
+      if (format === 'table') info(`Updated campaign ${c.id}.`)
+      showCampaign(c, format)
+    })
+
+  campaigns
+    .command('duplicate <campaign-id>')
+    .alias('dup')
+    .description('Copy a campaign into a new draft')
+    .option('--title <title>', "The copy's title. Defaults to the original's")
+    .action(async (id: string, options: { title?: string }) => {
+      const globals = getGlobals()
+      const format = resolveFormat(globals)
+      const c = await duplicateCampaign(clientFrom(globals), campaignId(id), options.title)
+      // The id is what a script needs next, so it goes to stdout even in table mode.
+      if (format === 'table') {
+        info(`Copied campaign ${id} to a new draft, "${c.title}".`)
+        process.stdout.write(`${c.id}\n`)
+      } else showCampaign(c, format)
+    })
+
+  campaigns
+    .command('delete <campaign-id>')
+    .alias('rm')
+    .description('Delete a campaign. A sent campaign loses its report')
+    .option('-y, --yes', 'Delete without asking for confirmation (required when not run interactively)')
+    .action(async (id: string, options: { yes?: boolean }) => {
+      const globals = getGlobals()
+      const client = clientFrom(globals)
+      const campaign = campaignId(id)
+
+      if (!options.yes) {
+        if (!process.stdin.isTTY) {
+          throw new UsageError('Refusing to delete without confirmation.', 'Pass --yes to delete from a script.')
+        }
+        // Fetching it first also fails fast on a wrong or foreign id.
+        const c = await getCampaign(client, campaign)
+        const loses = c.status === 'sent' || c.status === 'paused' ? ' and its report' : ''
+        if (!(await confirm(`Delete ${c.status} campaign ${c.id} "${c.title}"${loses}? This cannot be undone.`))) {
+          info('Not deleted.')
+          return
+        }
+      }
+
+      const r = await deleteCampaign(client, campaign)
+      renderAction({ outcome: 'deleted', campaign_id: r.campaign_id }, `Deleted campaign ${r.campaign_id}.`, resolveFormat(globals))
     })
 
   campaigns

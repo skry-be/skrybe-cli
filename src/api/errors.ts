@@ -139,7 +139,7 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
     hint: 'A list name can be at most 100 characters.',
   },
   'opt_in must be single or double': { code: 'invalid_opt_in', exitCode: Exit.USAGE },
-  'nothing to update': { code: 'nothing_to_update', exitCode: Exit.USAGE, hint: 'Pass --name and/or --opt-in.' },
+  'nothing to update': { code: 'nothing_to_update', exitCode: Exit.USAGE, hint: 'Pass at least one field to change.' },
   'list is used by a scheduled or sending campaign': {
     code: 'list_in_use',
     exitCode: Exit.API_ERROR,
@@ -172,7 +172,7 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
   'campaign has already been sent': {
     code: 'campaign_not_draft',
     exitCode: Exit.API_ERROR,
-    hint: 'Only a draft can be sent. `skrybe campaigns get <id>` shows its status.',
+    hint: 'It has already started sending, so it can no longer be sent, scheduled or edited. `skrybe campaigns get <id>` shows its status.',
   },
   'campaign is scheduled': {
     code: 'campaign_scheduled',
@@ -180,6 +180,22 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
     hint: 'Run `skrybe campaigns unschedule <id>` first, or leave it to send at its scheduled time.',
   },
   'campaign is not scheduled': { code: 'campaign_not_scheduled', exitCode: Exit.API_ERROR },
+
+  // Editing and deleting campaigns (campaigns/update-campaign.php, delete-campaign.php)
+  'campaign is sending': {
+    code: 'campaign_sending',
+    exitCode: Exit.API_ERROR,
+    hint: 'Stop it in the Skrybe UI first, or wait for it to finish.',
+  },
+  'subject cannot be empty': { code: 'subject_empty', exitCode: Exit.USAGE },
+  'html cannot be empty': { code: 'html_empty', exitCode: Exit.USAGE },
+  'invalid from_email': { code: 'invalid_from_email', exitCode: Exit.USAGE },
+  'invalid reply_to': { code: 'invalid_reply_to', exitCode: Exit.USAGE },
+  'track_opens and track_clicks must be 0, 1 or 2': {
+    code: 'invalid_tracking',
+    exitCode: Exit.USAGE,
+    hint: '0 off, 1 on, 2 anonymous.',
+  },
   'campaign was changed by another request. try again.': { code: 'conflict', exitCode: Exit.API_ERROR },
 
   // Scheduling (campaigns/schedule.php; the invalid-date wording is create.php's too)
@@ -270,6 +286,7 @@ const PROSE_PATTERN_ERRORS: [RegExp, ProseRule][] = [
       hint: 'Sending is paused while the brand is reviewed for a high bounce rate. Contact Skrybe support.',
     },
   ],
+  [/^a field is too long/, { code: 'field_too_long', exitCode: Exit.USAGE }],
   [
     /^brand is under review/,
     {
