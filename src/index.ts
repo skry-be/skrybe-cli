@@ -123,7 +123,23 @@ function applyExitPolicy(command: CommanderCommand): void {
   for (const child of command.commands) applyExitPolicy(child)
 }
 
+/**
+ * `skrybe lists | head -3` closes the pipe once head has its three lines, and
+ * the next write fails with EPIPE. Unhandled, Node prints a stack trace. The
+ * reader leaving early is not our failure, so stop quietly and successfully,
+ * which keeps `set -o pipefail` scripts happy too. stderr gets the same
+ * treatment for `2>&1 | head`.
+ */
+function exitQuietlyOnClosedPipe(stream: NodeJS.WriteStream): void {
+  stream.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EPIPE') process.exit(Exit.OK)
+    throw err
+  })
+}
+
 async function main(): Promise<void> {
+  exitQuietlyOnClosedPipe(process.stdout)
+  exitQuietlyOnClosedPipe(process.stderr)
   applyExitPolicy(program)
   await program.parseAsync(process.argv)
 }

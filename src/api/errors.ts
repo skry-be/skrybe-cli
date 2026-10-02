@@ -143,6 +143,48 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
   'html not passed': { code: 'html_missing', exitCode: Exit.USAGE },
   'editor must be html or dragdrop': { code: 'invalid_editor', exitCode: Exit.USAGE },
 
+  // List management (lists/create.php, update-list.php, delete.php)
+  'list name not passed': { code: 'list_name_missing', exitCode: Exit.USAGE },
+  'list name is too long': {
+    code: 'list_name_too_long',
+    exitCode: Exit.USAGE,
+    hint: 'A list name can be at most 100 characters.',
+  },
+  'opt_in must be single or double': { code: 'invalid_opt_in', exitCode: Exit.USAGE },
+  'nothing to update': { code: 'nothing_to_update', exitCode: Exit.USAGE, hint: 'Pass at least one field to change.' },
+  'list is used by a scheduled or sending campaign': {
+    code: 'list_in_use',
+    exitCode: Exit.API_ERROR,
+    hint: 'Unschedule the campaign, or wait for it to finish sending, then delete the list.',
+  },
+
+  // Custom fields (lists/add-custom-field.php, rename-custom-field.php, delete-custom-field.php)
+  'field name not passed': { code: 'field_name_missing', exitCode: Exit.USAGE },
+  'invalid field name': {
+    code: 'invalid_field_name',
+    exitCode: Exit.USAGE,
+    hint: 'Up to 100 characters, without : % [ ] , " < or >.',
+  },
+  'name and email are built-in fields': { code: 'reserved_field_name', exitCode: Exit.USAGE },
+  'type must be text or date': { code: 'invalid_field_type', exitCode: Exit.USAGE },
+  'field already exists': { code: 'field_exists', exitCode: Exit.API_ERROR, hint: 'Field names are case-insensitive.' },
+  'field does not exist': {
+    code: 'field_not_found',
+    exitCode: Exit.API_ERROR,
+    hint: 'Run `skrybe lists fields <list-id>` to see the fields.',
+  },
+  'field is used by an autoresponder': {
+    code: 'field_in_use',
+    exitCode: Exit.API_ERROR,
+    hint: 'Change the autoresponder in the Skrybe UI first.',
+  },
+  'field is used by a segment': {
+    code: 'field_in_use',
+    exitCode: Exit.API_ERROR,
+    hint: 'Remove it from the segment in the Skrybe UI first.',
+  },
+  'list was changed by another request. try again.': { code: 'conflict', exitCode: Exit.API_ERROR },
+
   // Campaigns (get-campaigns.php, get-campaign.php, stats.php)
   'campaign id not passed': { code: 'campaign_id_missing', exitCode: Exit.USAGE },
   'campaign does not exist': {
@@ -151,6 +193,84 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
     hint: 'Run `skrybe campaigns` to see the IDs available to this API key.',
   },
   'invalid status': { code: 'invalid_status', exitCode: Exit.USAGE },
+  'invalid page': { code: 'invalid_page', exitCode: Exit.USAGE },
+  'invalid limit': { code: 'invalid_limit', exitCode: Exit.USAGE, hint: 'A page holds at most 1000 subscribers.' },
+
+  // Sending a campaign (campaigns/send.php; the list and segment wording is create.php's too)
+  'list or segment id(s) not passed': {
+    code: 'recipients_missing',
+    exitCode: Exit.USAGE,
+    hint: 'Pass at least one --list or --segment.',
+  },
+  'one or more list ids are invalid': {
+    code: 'list_not_found',
+    exitCode: Exit.API_ERROR,
+    hint: 'Run `skrybe lists` to see the IDs available to this API key.',
+  },
+  'one or more segment ids are invalid': { code: 'segment_not_found', exitCode: Exit.API_ERROR },
+  'campaign has already been sent': {
+    code: 'campaign_not_draft',
+    exitCode: Exit.API_ERROR,
+    hint: 'It has already started sending, so it can no longer be sent, scheduled or edited. `skrybe campaigns get <id>` shows its status.',
+  },
+  'campaign is scheduled': {
+    code: 'campaign_scheduled',
+    exitCode: Exit.API_ERROR,
+    hint: 'Run `skrybe campaigns unschedule <id>` first, or leave it to send at its scheduled time.',
+  },
+  'campaign is not scheduled': { code: 'campaign_not_scheduled', exitCode: Exit.API_ERROR },
+
+  // Editing and deleting campaigns (campaigns/update-campaign.php, delete-campaign.php)
+  'campaign is sending': {
+    code: 'campaign_sending',
+    exitCode: Exit.API_ERROR,
+    hint: 'Stop it in the Skrybe UI first, or wait for it to finish.',
+  },
+  'subject cannot be empty': { code: 'subject_empty', exitCode: Exit.USAGE },
+  'html cannot be empty': { code: 'html_empty', exitCode: Exit.USAGE },
+  'invalid from_email': { code: 'invalid_from_email', exitCode: Exit.USAGE },
+  'invalid reply_to': { code: 'invalid_reply_to', exitCode: Exit.USAGE },
+  'track_opens and track_clicks must be 0, 1 or 2': {
+    code: 'invalid_tracking',
+    exitCode: Exit.USAGE,
+    hint: '0 off, 1 on, 2 anonymous.',
+  },
+  'campaign was changed by another request. try again.': { code: 'conflict', exitCode: Exit.API_ERROR },
+
+  // Scheduling (campaigns/schedule.php; the invalid-date wording is create.php's too)
+  'schedule_date_time not passed': { code: 'schedule_missing', exitCode: Exit.USAGE, hint: 'Pass --at.' },
+  'schedule_date_time is invalid': {
+    code: 'invalid_schedule',
+    exitCode: Exit.USAGE,
+    hint: 'Use a date and time such as "2027-06-15 18:05" or "June 15, 2027 6:05pm".',
+  },
+  'schedule_date_time is in the past': {
+    code: 'schedule_in_past',
+    exitCode: Exit.USAGE,
+    hint: 'The time is read in --timezone, or the account timezone if that is not given.',
+  },
+  'schedule_timezone is invalid': {
+    code: 'invalid_timezone',
+    exitCode: Exit.USAGE,
+    hint: 'Use an IANA name such as Africa/Lagos or America/New_York.',
+  },
+  // Test sends (campaigns/test-send.php, sharing its gates with the UI)
+  'email addresses not passed': {
+    code: 'emails_missing',
+    exitCode: Exit.USAGE,
+    hint: 'Pass at least one --to address.',
+  },
+  'too many email addresses': {
+    code: 'too_many_emails',
+    exitCode: Exit.USAGE,
+    hint: 'A test send goes to at most 5 addresses.',
+  },
+  'quota exceeded. please upgrade your plan.': { code: 'quota_exceeded', exitCode: Exit.QUOTA_OR_RATE_LIMIT },
+  'no active subscribers to send to': {
+    code: 'no_recipients',
+    exitCode: Exit.API_ERROR,
+    hint: 'Every subscriber on those lists is unsubscribed, bounced, unconfirmed or excluded.',
+  },
 
   // Subscribers
   'subscriber does not exist': { code: 'subscriber_not_found', exitCode: Exit.API_ERROR },
@@ -192,6 +312,55 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
 }
 
 /**
+ * Prose that embeds a variable part — a domain name, a review reason — matched
+ * by pattern instead. Checked after the exact table.
+ */
+const PROSE_PATTERN_ERRORS: [RegExp, ProseRule][] = [
+  [/^error: this campaign would exceed/, { code: 'quota_exceeded', exitCode: Exit.QUOTA_OR_RATE_LIMIT }],
+  [
+    /^account under review:/,
+    {
+      code: 'account_under_review',
+      exitCode: Exit.API_ERROR,
+      hint: 'Sending is paused while the brand is reviewed for a high bounce rate. Contact Skrybe support.',
+    },
+  ],
+  [/^a field is too long/, { code: 'field_too_long', exitCode: Exit.USAGE }],
+  [
+    /^brand is under review/,
+    {
+      code: 'account_under_review',
+      exitCode: Exit.API_ERROR,
+      hint: 'Sending is paused while the brand is reviewed for a high bounce rate. Contact Skrybe support.',
+    },
+  ],
+  [
+    /^test send rate limit reached/,
+    {
+      code: 'rate_limited',
+      exitCode: Exit.QUOTA_OR_RATE_LIMIT,
+      hint: 'Test sends are limited to 20 an hour per brand, shared with the Skrybe UI.',
+    },
+  ],
+  [
+    /^domain not verified in ses/,
+    {
+      code: 'domain_not_verified',
+      exitCode: Exit.API_ERROR,
+      hint: "Verify the campaign's From domain for this brand in the Skrybe UI.",
+    },
+  ],
+  [
+    /^domain ".*" is not verified/,
+    {
+      code: 'domain_not_verified',
+      exitCode: Exit.API_ERROR,
+      hint: "Verify the campaign's From domain for this brand in the Skrybe UI.",
+    },
+  ],
+]
+
+/**
  * Bodies that mean "nothing to return" rather than a failure. get-lists.php,
  * get-brands.php and get-campaigns.php answer with prose instead of an empty object when the
  * brand has no rows, and an empty collection is not an error.
@@ -227,6 +396,12 @@ export function classifyProse(body: string, status?: number): ApiError | null {
   const rule = PROSE_ERRORS[key]
   if (rule) {
     return new ApiError(rule.code, trimmed, rule.exitCode, { raw: body, status, hint: rule.hint })
+  }
+
+  for (const [pattern, patternRule] of PROSE_PATTERN_ERRORS) {
+    if (pattern.test(key)) {
+      return new ApiError(patternRule.code, trimmed, patternRule.exitCode, { raw: body, status, hint: patternRule.hint })
+    }
   }
 
   // `api/campaigns/create.php` emits a family of "Unable to ..." failures that
