@@ -25,6 +25,10 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
+      # A version bump without changelog notes would fail the release after
+      # merge; catch it on the PR instead. See scripts/release.mjs.
+      - name: CHANGELOG.md has notes for this version
+        run: node scripts/release.mjs check
       - run: npm run typecheck
       - run: npm test
       - run: npm run build

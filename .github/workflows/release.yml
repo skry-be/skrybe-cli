@@ -1,32 +1,44 @@
 name: Release
 
-# Publishes @skrybe/cli to npm using trusted publishing: the runner proves its
-# identity to npm over OIDC and is issued a short-lived credential, so there is
-# no long-lived token in this repository to leak, rotate or let expire.
+# Publishes @skrybe/cli to npm when a version bump lands on main, then tags
+# the commit vX.Y.Z and opens a GitHub Release with that version's changelog.
 #
-# This requires a trusted publisher configured on npmjs.com for @skrybe/cli,
-# naming this repository and this workflow file.
+# Releasing is merging a release PR; nothing is pushed to main by hand:
 #
-# `npm version` is told not to tag, because tagging and pushing are separate
-# steps here — the tag is what triggers this workflow, so it should not fire
-# until the bump commit is on main.
+#   npm run release:prepare -- 0.2.0     # bumps package.json + lock, dates CHANGELOG.md
+#   git checkout -b release/v0.2.0
+#   git commit -am 'chore: release 0.2.0'
+#   git push -u origin release/v0.2.0    # open a PR into main; merging it releases
 #
-#   npm version patch --no-git-tag-version   # or minor / major
-#   git commit -am 'chore: release 0.1.1'
-#   git tag v0.1.1
-#   git push origin main --tags
+# The tag is created here, after publishing, rather than pushed to start the
+# run: a tag pushed with the workflow's own token would not trigger another
+# workflow anyway, and this way a tag only exists for a version npm accepted.
+#
+# Uses npm trusted publishing: the runner proves its identity over OIDC and is
+# issued a short-lived credential, so there is no npm token in this repository.
+# The trusted publisher on npmjs.com names this repository and this workflow
+# file, so keep the file name. The npm-publish environment only allows main and
+# v* tags.
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    # Only a manifest change can be a version bump
+    paths: [package.json]
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Pack and validate without publishing'
+        description: 'Pack and validate without publishing or tagging'
         type: boolean
         default: true
 
+# Two quick merges must not race to publish the same version
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 permissions:
-  contents: read
+  # Creating the tag and the GitHub Release
+  contents: write
   # The OIDC token trusted publishing exchanges for a publish credential, and
   # what provenance is signed with. Without it npm falls back to looking for a
   # token, finds none, and fails as though the package did not exist.
@@ -44,27 +56,40 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
 
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-
-      # A tag that disagrees with package.json would publish a version nobody
-      # can find from the git history, so refuse rather than guess.
-      - name: Check the tag matches package.json
-        if: startsWith(github.ref, 'refs/tags/')
+      # A push that touched package.json without changing the version (a
+      # dependency bump, say) has nothing to release, so stop quietly.
+      - name: Is this version new?
+        id: version
         run: |
-          tagged="${GITHUB_REF_NAME#v}"
-          declared="$(node -p 'require("./package.json").version')"
-          if [ "$tagged" != "$declared" ]; then
-            echo "Tag v$tagged does not match package.json version $declared." >&2
-            exit 1
+          version="$(node -p 'require("./package.json").version')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if npm view "@skrybe/cli@$version" version --registry https://registry.npmjs.org >/dev/null 2>&1; then
+            echo "@skrybe/cli@$version is already on npm; nothing to release."
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Releasing $version."
+            echo "new=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - if: steps.version.outputs.new == 'true'
+        run: npm ci
+      - if: steps.version.outputs.new == 'true'
+        run: npm run typecheck
+      - if: steps.version.outputs.new == 'true'
+        run: npm test
+
+      # The GitHub Release body. Checked before publishing so a missing section
+      # fails the run while nothing has been published yet.
+      - name: Release notes
+        if: steps.version.outputs.new == 'true'
+        run: node scripts/release.mjs notes "${{ steps.version.outputs.version }}" > "$RUNNER_TEMP/notes.md"
 
       # npm below 11.5.1 has no OIDC support at all. It does not say so: it
       # publishes as an anonymous user and the registry answers 404, which
       # reads as "no such package" and sends you looking for the wrong problem
       # entirely. Fail here instead, where the cause is stated.
       - name: Check npm can do OIDC
+        if: steps.version.outputs.new == 'true'
         run: |
           version="$(npm --version)"
           echo "npm $version"
@@ -75,12 +100,24 @@ jobs:
             exit 1
           fi
 
+      - name: Pack only (dry run)
+        if: steps.version.outputs.new == 'true' && inputs.dry_run
+        run: npm publish --dry-run
+
       # No credentials here on purpose. npm performs the OIDC exchange itself
-      # when it finds no token and the trusted publisher matches.
+      # when it finds no token and the trusted publisher matches. A manual run
+      # without dry_run publishes too, but only from main (the environment's
+      # branch policy).
       - name: Publish
-        if: ${{ !inputs.dry_run }}
+        if: steps.version.outputs.new == 'true' && !inputs.dry_run
         run: npm publish
 
-      - name: Pack only (dry run)
-        if: ${{ inputs.dry_run }}
-        run: npm publish --dry-run
+      - name: Tag and release on GitHub
+        if: steps.version.outputs.new == 'true' && !inputs.dry_run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            --target "$GITHUB_SHA" \
+            --title "v${{ steps.version.outputs.version }}" \
+            --notes-file "$RUNNER_TEMP/notes.md"
