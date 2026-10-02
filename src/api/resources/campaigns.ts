@@ -41,8 +41,7 @@ export interface CampaignResult {
 
 /**
  * `api/campaigns/create.php` creates a draft, and optionally sends or schedules
- * it in the same call. There is no separate send endpoint, which is why
- * `campaigns send <id>` for an existing draft still does not exist.
+ * it in the same call. To send a draft that already exists, see `sendCampaign`.
  */
 export async function createCampaign(
   client: SkrybeClient,
@@ -212,4 +211,47 @@ export async function campaignStats(client: SkrybeClient, campaignId: number): P
     retryable: true,
   })
   return parseJsonObject<CampaignStats>(body, 'campaign stats')
+}
+
+export interface SendCampaignInput {
+  /** Encrypted list ids. At least one list or segment is required. */
+  listIds?: string[]
+  segmentIds?: string[]
+  excludeListIds?: string[]
+  excludeSegmentIds?: string[]
+  /** Run every check and count the recipients, but send nothing. */
+  dryRun?: boolean
+}
+
+export interface SendCampaignResult {
+  status: 'sending' | 'dry_run'
+  campaign_id: number
+  /** Unique active subscribers the campaign goes (or would go) to. */
+  recipients: number
+}
+
+/**
+ * `api/campaigns/send.php` sends an existing draft. It only ever claims a
+ * draft, so a retry after a lost response answers "Campaign has already been
+ * sent" rather than sending twice. It is still not marked `retryable`: that
+ * answer would turn a success into a reported failure.
+ */
+export async function sendCampaign(
+  client: SkrybeClient,
+  campaignId: number,
+  input: SendCampaignInput,
+): Promise<SendCampaignResult> {
+  const join = (ids?: string[]) => (ids && ids.length > 0 ? ids.join(',') : undefined)
+  const body = await client.requestText({
+    path: 'api/campaigns/send.php',
+    body: {
+      campaign_id: campaignId,
+      list_ids: join(input.listIds),
+      segment_ids: join(input.segmentIds),
+      exclude_list_ids: join(input.excludeListIds),
+      exclude_segment_ids: join(input.excludeSegmentIds),
+      dry_run: input.dryRun ? 1 : undefined,
+    },
+  })
+  return parseJsonObject<SendCampaignResult>(body, 'send result')
 }
