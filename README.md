@@ -68,6 +68,9 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe templates get <id>` | One template; `--content` prints its HTML |
 | `skrybe templates create <name> --html-text file://…` | Create a template; prints its id |
 | `skrybe templates update <id>` / `delete <id>` | Edit or delete a template (delete asks first; `--yes` in scripts) |
+| `skrybe autoresponders` | Autoresponders, with how many emails are on (`--list`); read-only |
+| `skrybe autoresponders emails <id>` | An autoresponder's emails, in the order they go out |
+| `skrybe autoresponders stats <email-id>` | Opens, clicks, bounces, complaints and unsubscribes for one email |
 | `skrybe auth login` | Store an API key for an install |
 | `skrybe auth list` | List saved profiles |
 | `skrybe auth logout` | Remove a saved profile |

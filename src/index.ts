@@ -3,6 +3,7 @@ import type { Command as CommanderCommand } from 'commander'
 
 import { CliError, Exit } from './api/errors.js'
 import { authCommand, whoamiCommand } from './commands/auth.js'
+import { autorespondersCommand } from './commands/autoresponders.js'
 import { brandsCommand } from './commands/brands.js'
 import { campaignsCommand } from './commands/campaigns.js'
 import { completionCommand } from './commands/completion.js'
@@ -58,6 +59,7 @@ program.addCommand(brandsCommand(getGlobals))
 program.addCommand(lists)
 program.addCommand(campaigns)
 program.addCommand(templatesCommand(getGlobals))
+program.addCommand(autorespondersCommand(getGlobals))
 program.addCommand(emailsCommand(getGlobals))
 program.addCommand(subscribersCommand(getGlobals))
 program.addCommand(statsCommand(getGlobals))
