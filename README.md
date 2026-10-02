@@ -45,6 +45,7 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe campaigns` | Campaigns, newest first (`--status`, `--page`, `--limit`, `--all`) |
 | `skrybe campaigns get <id>` | One campaign's details; `--content` prints its HTML |
 | `skrybe campaigns stats <id>` | Opens, clicks, bounces, complaints, unsubscribes, per-link clicks |
+| `skrybe campaigns activity <id>` | Who opened (`--type opens`), clicked, bounced, complained or unsubscribed (`--all`) |
 | `skrybe campaigns create ...` | Create a campaign, optionally sending or scheduling it |
 | `skrybe emails send ...` | Send or schedule an email to addresses or lists |
 | `skrybe emails send-transactional ...` | Send one email immediately, bypassing the queue |

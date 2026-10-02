@@ -139,6 +139,9 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
     hint: 'Run `skrybe campaigns` to see the IDs available to this API key.',
   },
   'invalid status': { code: 'invalid_status', exitCode: Exit.USAGE },
+  'invalid page': { code: 'invalid_page', exitCode: Exit.USAGE },
+  'invalid limit': { code: 'invalid_limit', exitCode: Exit.USAGE, hint: 'A page holds at most 1000 subscribers.' },
+  'invalid type': { code: 'invalid_type', exitCode: Exit.USAGE },
 
   // Subscribers
   'subscriber does not exist': { code: 'subscriber_not_found', exitCode: Exit.API_ERROR },

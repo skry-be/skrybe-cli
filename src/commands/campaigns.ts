@@ -2,18 +2,24 @@ import { Command, Option } from 'commander'
 
 import { UsageError } from '../api/errors.js'
 import {
+  ACTIVITY_TYPES,
   CAMPAIGN_STATUSES,
+  MAX_ACTIVITY_PAGE,
   MAX_PAGE_SIZE,
+  allCampaignActivity,
+  campaignActivity,
   campaignStats,
   createCampaign,
   getCampaign,
   listAllCampaigns,
   listCampaigns,
+  type ActivityType,
   type Campaign,
+  type CampaignActivity,
   type CampaignStatus,
 } from '../api/resources/campaigns.js'
 import { resolveArg, resolveOptionalArg } from '../input.js'
-import { printTable, renderAction, renderCollection, renderRecord, resolveFormat } from '../output.js'
+import { info, printTable, renderAction, renderCollection, renderRecord, resolveFormat } from '../output.js'
 import { clientFrom, type GlobalOptions } from './context.js'
 
 interface CreateOptions {
@@ -200,6 +206,66 @@ export function campaignsCommand(getGlobals: () => GlobalOptions): Command {
           { header: 'LINK', value: (l) => l.url },
         ])
       }
+    })
+
+  campaigns
+    .command('activity <campaign-id>')
+    .description('Who opened, clicked, bounced, complained or unsubscribed')
+    .addOption(new Option('--type <type>', 'What to show (default opens)').choices(ACTIVITY_TYPES))
+    .option('--page <n>', 'Page to show (default 1)')
+    .option('--limit <n>', `Subscribers per page, up to ${MAX_ACTIVITY_PAGE} (default 100)`)
+    .option('--all', 'Fetch every page')
+    .addHelpText(
+      'after',
+      '\nBounces, complaints and unsubscribes are attributed to a subscriber\'s latest campaign, as the report does.',
+    )
+    .action(async (id: string, _options: unknown, command: Command) => {
+      // --page, --limit and --all are also declared on `campaigns` itself (for
+      // listing campaigns), and Commander hands them to the parent wherever they
+      // appear, so read them back through optsWithGlobals(), as `ls` does.
+      const options = command.optsWithGlobals<{ type?: ActivityType; page?: string; limit?: string; all?: boolean }>()
+      const globals = getGlobals()
+      const format = resolveFormat(globals)
+      const client = clientFrom(globals)
+      const campaign = campaignId(id)
+      const type = options.type ?? 'opens'
+
+      if (options.all && (options.page !== undefined || options.limit !== undefined)) {
+        throw new UsageError('--all fetches every page, so it cannot be combined with --page or --limit.')
+      }
+      let rows: CampaignActivity[]
+      if (options.all) rows = await allCampaignActivity(client, campaign, type)
+      else {
+        const page = await campaignActivity(client, campaign, {
+          type,
+          page: positive(options.page, '--page'),
+          limit: positive(options.limit, '--limit', MAX_ACTIVITY_PAGE),
+        })
+        rows = page.activity
+        if (format === 'table' && page.total > rows.length) {
+          const first = (page.page - 1) * page.limit
+          info(`Showing ${first + 1}-${first + rows.length} of ${count(page.total)}. Use --page, or --all.`)
+        }
+      }
+
+      const detail =
+        type === 'opens'
+          ? [
+              { header: 'OPENS', value: (a: CampaignActivity) => count(a.opens ?? 0), align: 'right' as const },
+              { header: 'COUNTRY', value: (a: CampaignActivity) => a.country ?? '-' },
+            ]
+          : type === 'clicks'
+            ? [
+                { header: 'CLICKS', value: (a: CampaignActivity) => count(a.clicks ?? 0), align: 'right' as const },
+                { header: 'LINKS', value: (a: CampaignActivity) => (a.links ?? []).join(' ') },
+              ]
+            : []
+      renderCollection<CampaignActivity>(
+        rows,
+        [{ header: 'EMAIL', value: (a) => a.email }, { header: 'NAME', value: (a) => a.name }, ...detail],
+        format,
+        `No ${type} for this campaign${options.page ? ' on this page' : ''}.`,
+      )
     })
 
   campaigns
