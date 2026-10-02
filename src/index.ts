@@ -11,6 +11,7 @@ import { emailsCommand } from './commands/emails.js'
 import { listsCommand } from './commands/lists.js'
 import { statsCommand } from './commands/stats.js'
 import { subscribersCommand } from './commands/subscribers.js'
+import { templatesCommand } from './commands/templates.js'
 import { registerStubs } from './commands/unimplemented.js'
 import { bold, dim, red, resolveFormat, type OutputFormat } from './output.js'
 import { version } from './version.js'
@@ -56,6 +57,7 @@ program.addCommand(whoamiCommand(getGlobals))
 program.addCommand(brandsCommand(getGlobals))
 program.addCommand(lists)
 program.addCommand(campaigns)
+program.addCommand(templatesCommand(getGlobals))
 program.addCommand(emailsCommand(getGlobals))
 program.addCommand(subscribersCommand(getGlobals))
 program.addCommand(statsCommand(getGlobals))

@@ -12,17 +12,20 @@ import {
   type Campaign,
   type CampaignStatus,
 } from '../api/resources/campaigns.js'
+import { getTemplate } from '../api/resources/templates.js'
 import { resolveArg, resolveOptionalArg } from '../input.js'
 import { printTable, renderAction, renderCollection, renderRecord, resolveFormat } from '../output.js'
 import { clientFrom, type GlobalOptions } from './context.js'
+import { templateId } from './templates.js'
 
 interface CreateOptions {
-  fromName: string
-  fromEmail: string
-  replyTo: string
+  fromName?: string
+  fromEmail?: string
+  replyTo?: string
   title: string
   subject: string
-  htmlText: string
+  htmlText?: string
+  template?: string
   plainText?: string
   list?: string[]
   segment?: string[]
@@ -207,10 +210,11 @@ export function campaignsCommand(getGlobals: () => GlobalOptions): Command {
     .description('Create a campaign, optionally sending or scheduling it')
     .requiredOption('--title <title>', 'Campaign title, shown in the dashboard')
     .requiredOption('--subject <subject>', 'Subject line')
-    .requiredOption('--from-name <name>', "The 'From' name")
-    .requiredOption('--from-email <email>', "The 'From' address")
-    .requiredOption('--reply-to <email>', "The 'Reply to' address")
-    .requiredOption('--html-text <html|file://path>', 'HTML body, or file:// a path to it')
+    .option('--template <template-id>', 'Start from a template: its body, and its sender unless given below')
+    .option('--from-name <name>', "The 'From' name")
+    .option('--from-email <email>', "The 'From' address")
+    .option('--reply-to <email>', "The 'Reply to' address")
+    .option('--html-text <html|file://path>', 'HTML body, or file:// a path to it')
     .option('--plain-text <text|file://path>', 'Plain text body, or file:// a path to it')
     .option('--list <list-id>', 'List to send to. Repeatable.', collect, [])
     .option('--segment <segment-id>', 'Segment to send to. Repeatable.', collect, [])
@@ -224,14 +228,45 @@ export function campaignsCommand(getGlobals: () => GlobalOptions): Command {
     .option('--timezone <tz>', 'e.g. America/New_York. Defaults to the brand timezone')
     .action(async (options: CreateOptions) => {
       const globals = getGlobals()
-      const result = await createCampaign(clientFrom(globals), {
-        fromName: options.fromName,
-        fromEmail: options.fromEmail,
-        replyTo: options.replyTo,
+      const client = clientFrom(globals)
+
+      // A template supplies the body, and the sender where the flags don't.
+      // Flags always win, so a template can be reused with a different sender.
+      const t = options.template
+        ? await getTemplate(client, templateId(options.template), { includeContent: true })
+        : undefined
+      const pick = (flag: string | undefined, fromTemplate: string | undefined) =>
+        flag !== undefined ? flag : fromTemplate || undefined
+      const sender = {
+        fromName: pick(options.fromName, t?.from_name),
+        fromEmail: pick(options.fromEmail, t?.from_email),
+        replyTo: pick(options.replyTo, t?.reply_to || t?.from_email),
+      }
+      const htmlText = options.htmlText !== undefined ? resolveArg(options.htmlText, '--html-text') : t?.html_text
+      const plainText =
+        options.plainText !== undefined ? resolveOptionalArg(options.plainText, '--plain-text') : t?.plain_text || undefined
+
+      const missing = [
+        ['--from-name', sender.fromName],
+        ['--from-email', sender.fromEmail],
+        ['--reply-to', sender.replyTo],
+        ['--html-text', htmlText],
+      ].filter(([, value]) => !value).map(([flag]) => flag)
+      if (missing.length > 0) {
+        throw new UsageError(
+          `Missing ${missing.join(', ')}.`,
+          t ? `Template ${t.id} doesn't set ${missing.length === 1 ? 'it' : 'them'}, so pass it on the command line.` : 'Pass them, or --template to start from a template.',
+        )
+      }
+
+      const result = await createCampaign(client, {
+        fromName: sender.fromName as string,
+        fromEmail: sender.fromEmail as string,
+        replyTo: sender.replyTo as string,
         title: options.title,
         subject: options.subject,
-        htmlText: resolveArg(options.htmlText, '--html-text'),
-        plainText: resolveOptionalArg(options.plainText, '--plain-text'),
+        htmlText: htmlText as string,
+        plainText,
         listIds: options.list,
         segmentIds: options.segment,
         excludeListIds: options.excludeList,
