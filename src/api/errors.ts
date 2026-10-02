@@ -131,6 +131,18 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
     hint: 'A list ID is the encrypted value `skrybe lists` prints, not the integer in the UI URL.',
   },
 
+  // Templates (templates/*.php)
+  'template id not passed': { code: 'template_id_missing', exitCode: Exit.USAGE },
+  'template does not exist': {
+    code: 'template_not_found',
+    exitCode: Exit.API_ERROR,
+    hint: 'Run `skrybe templates` to see the IDs available to this API key.',
+  },
+  'template name not passed': { code: 'template_name_missing', exitCode: Exit.USAGE },
+  'template name cannot be empty': { code: 'template_name_missing', exitCode: Exit.USAGE },
+  'html not passed': { code: 'html_missing', exitCode: Exit.USAGE },
+  'editor must be html or dragdrop': { code: 'invalid_editor', exitCode: Exit.USAGE },
+
   // List management (lists/create.php, update-list.php, delete.php)
   'list name not passed': { code: 'list_name_missing', exitCode: Exit.USAGE },
   'list name is too long': {

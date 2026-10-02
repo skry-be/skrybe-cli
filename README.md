@@ -64,6 +64,10 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe campaigns test <id> --to <email>` | Send a test to up to 5 addresses (20 requests an hour per brand) |
 | `skrybe emails send ...` | Send or schedule an email to addresses or lists |
 | `skrybe emails send-transactional ...` | Send one email immediately, bypassing the queue |
+| `skrybe templates` | The brand's email templates |
+| `skrybe templates get <id>` | One template; `--content` prints its HTML |
+| `skrybe templates create <name> --html-text file://…` | Create a template; prints its id |
+| `skrybe templates update <id>` / `delete <id>` | Edit or delete a template (delete asks first; `--yes` in scripts) |
 | `skrybe auth login` | Store an API key for an install |
 | `skrybe auth list` | List saved profiles |
 | `skrybe auth logout` | Remove a saved profile |
@@ -88,6 +92,14 @@ skrybe campaigns create \
   --from-name Acme --from-email hello@acme.test --reply-to hello@acme.test \
   --html-text file://campaign.html \
   --list <list-id>
+```
+
+`--template <id>` starts from a template instead: it supplies the HTML, plain
+text and sender, and any of `--html-text`, `--from-name`, `--from-email` or
+`--reply-to` given alongside it take precedence:
+
+```bash
+skrybe campaigns create --template 7 --title 'Q4 newsletter' --subject 'Your Q4 update'
 ```
 
 Add `--send` to send it immediately, or `--schedule 'June 15, 2027 6:05pm'` to
