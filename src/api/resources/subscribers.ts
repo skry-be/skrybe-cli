@@ -1,5 +1,6 @@
 import type { SkrybeClient } from '../client.js'
 import { ApiError, Exit, excerpt, isProseSuccess } from '../errors.js'
+import { parseJsonObject } from '../parse.js'
 
 export interface SubscriberRef {
   /** The encrypted list id, as printed by `skrybe lists`. */
@@ -21,6 +22,10 @@ export interface SubscribeInput extends SubscriberRef {
    * whose tag is `[Birthday,fallback=]`. They go in as ordinary POST fields
    * alongside the documented ones, so a field named `email` or `list` would
    * collide; the documented names are written last and win.
+   *
+   * subscribe.php matches a field by its name with the spaces taken out (and
+   * PHP would turn a space in a POST key into `_` anyway), so `Favourite colour`
+   * is posted as `Favouritecolour`. Callers pass the name as the list shows it.
    */
   fields?: Record<string, string>
 }
@@ -40,7 +45,8 @@ export async function subscribe(
   client: SkrybeClient,
   input: SubscribeInput,
 ): Promise<SubscribeOutcome> {
-  const body: Record<string, string> = { ...(input.fields ?? {}) }
+  const body: Record<string, string> = {}
+  for (const [name, value] of Object.entries(input.fields ?? {})) body[name.replace(/ /g, '')] = value
 
   body.email = input.email
   body.list = input.listId
@@ -121,4 +127,62 @@ function unexpected(operation: string, body: string): ApiError {
     Exit.API_ERROR,
     { raw: body },
   )
+}
+
+/** Every subscriber is in exactly one of these; `active` is who a campaign sends to. */
+export const SUBSCRIBER_STATUSES = ['active', 'unconfirmed', 'unsubscribed', 'bounced', 'complained'] as const
+export type SubscriberStatus = (typeof SUBSCRIBER_STATUSES)[number]
+
+export interface Subscriber {
+  email: string
+  name: string
+  status: SubscriberStatus
+  /** Unix seconds. */
+  joined_at: number | null
+  /** By field name, in the list's order. Dates are YYYY-MM-DD; empty values are null. */
+  custom_fields: Record<string, string | null>
+}
+
+export interface SubscribersPage {
+  list_id: string
+  status: SubscriberStatus | null
+  page: number
+  limit: number
+  /** Subscribers matching the status filter, across all pages. */
+  total: number
+  subscribers: Subscriber[]
+}
+
+/** The server refuses larger pages. */
+export const MAX_SUBSCRIBERS_PAGE = 1000
+
+/** One page of `api/subscribers/get-subscribers.php`, oldest first. */
+export async function listSubscribers(
+  client: SkrybeClient,
+  listId: string,
+  opts: { status?: SubscriberStatus; page?: number; limit?: number } = {},
+): Promise<SubscribersPage> {
+  const body = await client.requestText({
+    path: 'api/subscribers/get-subscribers.php',
+    body: { list_id: listId, status: opts.status, page: opts.page, limit: opts.limit },
+    retryable: true,
+  })
+  return parseJsonObject<SubscribersPage>(body, 'subscribers page')
+}
+
+/**
+ * Every page, at the largest page size. Oldest first, so someone joining
+ * mid-way lands on a later page instead of shifting the ones already read.
+ */
+export async function listAllSubscribers(
+  client: SkrybeClient,
+  listId: string,
+  opts: { status?: SubscriberStatus } = {},
+): Promise<Subscriber[]> {
+  const all: Subscriber[] = []
+  for (let page = 1; ; page++) {
+    const r = await listSubscribers(client, listId, { ...opts, page, limit: MAX_SUBSCRIBERS_PAGE })
+    all.push(...r.subscribers)
+    if (r.subscribers.length < MAX_SUBSCRIBERS_PAGE) return all
+  }
 }

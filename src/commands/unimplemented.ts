@@ -7,7 +7,7 @@ import { CliError, Exit } from '../api/errors.js'
  * they exist only as session-authenticated UI pages, and the login is Turnstile
  * and 2FA gated, so there is nothing to call.
  *
- * Registering them as real commands means `skrybe campaigns send` explains the
+ * Registering them as real commands means `skrybe campaigns stop` explains the
  * situation instead of printing "unknown command", and it fixes the command
  * names now so adding the endpoint later is not a breaking change. The API is
  * gaining these one endpoint at a time; each stub goes when its endpoint lands.
@@ -25,13 +25,6 @@ export interface Stub {
 export const STUBS: Stub[] = [
   {
     parent: 'campaigns',
-    name: 'send',
-    args: '<campaign-id>',
-    description: 'Send an existing draft (not yet available in the API)',
-    blockedBy: 'includes/create/send-now.php — but `campaigns create --send` creates and sends in one call',
-  },
-  {
-    parent: 'campaigns',
     name: 'stop',
     args: '<campaign-id>',
     description: 'Stop a sending campaign (not yet available in the API)',
@@ -43,21 +36,6 @@ export const STUBS: Stub[] = [
     args: '<campaign-id>',
     description: 'Resume a stopped campaign (not yet available in the API)',
     blockedBy: 'includes/create/resume-campaign.php',
-  },
-  {
-    parent: 'lists',
-    name: 'create',
-    args: '<name>',
-    description: 'Create a list (not yet available in the API)',
-    blockedBy: 'includes/subscribers/import-add.php',
-  },
-  {
-    parent: 'lists',
-    name: 'delete',
-    aliases: ['rm'],
-    args: '<list-id>',
-    description: 'Delete a list (not yet available in the API)',
-    blockedBy: 'includes/list/delete.php',
   },
 ]
 

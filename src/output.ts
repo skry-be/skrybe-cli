@@ -204,3 +204,11 @@ export function renderRecord(
     process.stdout.write(`${bold(label.padEnd(width))}  ${value}\n`)
   }
 }
+
+/** Unix seconds -> "2026-08-31 10:18" in the local timezone, or "-" for none. */
+export function when(seconds: number | null): string {
+  if (seconds === null) return '-'
+  const d = new Date(seconds * 1000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}

@@ -3,6 +3,7 @@ import type { Command as CommanderCommand } from 'commander'
 
 import { CliError, Exit } from './api/errors.js'
 import { authCommand, whoamiCommand } from './commands/auth.js'
+import { autorespondersCommand } from './commands/autoresponders.js'
 import { brandsCommand } from './commands/brands.js'
 import { campaignsCommand } from './commands/campaigns.js'
 import { completionCommand } from './commands/completion.js'
@@ -11,6 +12,7 @@ import { emailsCommand } from './commands/emails.js'
 import { listsCommand } from './commands/lists.js'
 import { statsCommand } from './commands/stats.js'
 import { subscribersCommand } from './commands/subscribers.js'
+import { templatesCommand } from './commands/templates.js'
 import { registerStubs } from './commands/unimplemented.js'
 import { bold, dim, red, resolveFormat, type OutputFormat } from './output.js'
 import { version } from './version.js'
@@ -56,6 +58,8 @@ program.addCommand(whoamiCommand(getGlobals))
 program.addCommand(brandsCommand(getGlobals))
 program.addCommand(lists)
 program.addCommand(campaigns)
+program.addCommand(templatesCommand(getGlobals))
+program.addCommand(autorespondersCommand(getGlobals))
 program.addCommand(emailsCommand(getGlobals))
 program.addCommand(subscribersCommand(getGlobals))
 program.addCommand(statsCommand(getGlobals))
@@ -121,7 +125,23 @@ function applyExitPolicy(command: CommanderCommand): void {
   for (const child of command.commands) applyExitPolicy(child)
 }
 
+/**
+ * `skrybe lists | head -3` closes the pipe once head has its three lines, and
+ * the next write fails with EPIPE. Unhandled, Node prints a stack trace. The
+ * reader leaving early is not our failure, so stop quietly and successfully,
+ * which keeps `set -o pipefail` scripts happy too. stderr gets the same
+ * treatment for `2>&1 | head`.
+ */
+function exitQuietlyOnClosedPipe(stream: NodeJS.WriteStream): void {
+  stream.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EPIPE') process.exit(Exit.OK)
+    throw err
+  })
+}
+
 async function main(): Promise<void> {
+  exitQuietlyOnClosedPipe(process.stdout)
+  exitQuietlyOnClosedPipe(process.stderr)
   applyExitPolicy(program)
   await program.parseAsync(process.argv)
 }
