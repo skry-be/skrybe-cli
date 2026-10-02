@@ -209,6 +209,7 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
   'invalid status': { code: 'invalid_status', exitCode: Exit.USAGE },
   'invalid page': { code: 'invalid_page', exitCode: Exit.USAGE },
   'invalid limit': { code: 'invalid_limit', exitCode: Exit.USAGE, hint: 'A page holds at most 1000 subscribers.' },
+  'invalid type': { code: 'invalid_type', exitCode: Exit.USAGE },
 
   // Sending a campaign (campaigns/send.php; the list and segment wording is create.php's too)
   'list or segment id(s) not passed': {

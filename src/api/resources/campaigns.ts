@@ -408,3 +408,64 @@ export async function deleteCampaign(
   const body = await client.requestText({ path: 'api/campaigns/delete-campaign.php', body: { campaign_id: campaignId } })
   return parseJsonObject<{ campaign_id: number; deleted: true }>(body, 'delete result')
 }
+
+export const ACTIVITY_TYPES = ['opens', 'clicks', 'bounces', 'complaints', 'unsubscribes'] as const
+export type ActivityType = (typeof ACTIVITY_TYPES)[number]
+
+/** One subscriber's part in a campaign. `opens`/`country` only for opens, `clicks`/`links` only for clicks. */
+export interface CampaignActivity {
+  email: string
+  name: string
+  /** Encrypted, like the ids `skrybe lists` prints. */
+  list_id: string
+  opens?: number
+  /** Where they first opened it, when known. */
+  country?: string | null
+  clicks?: number
+  links?: string[]
+}
+
+export interface CampaignActivityPage {
+  campaign_id: number
+  type: ActivityType
+  page: number
+  limit: number
+  /** Subscribers across all pages. */
+  total: number
+  activity: CampaignActivity[]
+}
+
+/** The server refuses larger pages. */
+export const MAX_ACTIVITY_PAGE = 1000
+
+/**
+ * A page of `api/campaigns/get-activity.php`. Opens and clicks are in the
+ * order subscribers first did them. Bounces, complaints and unsubscribes are
+ * attributed through each subscriber's latest campaign, as the report does.
+ */
+export async function campaignActivity(
+  client: SkrybeClient,
+  campaignId: number,
+  opts: { type?: ActivityType; page?: number; limit?: number } = {},
+): Promise<CampaignActivityPage> {
+  const body = await client.requestText({
+    path: 'api/campaigns/get-activity.php',
+    body: { campaign_id: campaignId, type: opts.type, page: opts.page, limit: opts.limit },
+    retryable: true,
+  })
+  return parseJsonObject<CampaignActivityPage>(body, 'campaign activity')
+}
+
+/** Every page, at the largest page size, until the total is reached. */
+export async function allCampaignActivity(
+  client: SkrybeClient,
+  campaignId: number,
+  type: ActivityType,
+): Promise<CampaignActivity[]> {
+  const all: CampaignActivity[] = []
+  for (let page = 1; ; page++) {
+    const r = await campaignActivity(client, campaignId, { type, page, limit: MAX_ACTIVITY_PAGE })
+    all.push(...r.activity)
+    if (r.activity.length === 0 || page * MAX_ACTIVITY_PAGE >= r.total) return all
+  }
+}

@@ -57,6 +57,7 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe campaigns update <id> --subject ...` | Edit a draft or scheduled campaign; only the fields given change |
 | `skrybe campaigns duplicate <id>` | Copy a campaign into a new draft (`--title`); prints the new id |
 | `skrybe campaigns delete <id>` | Delete a campaign (asks first; `--yes` in scripts). A sent one loses its report |
+| `skrybe campaigns activity <id>` | Who opened (`--type opens`), clicked, bounced, complained or unsubscribed (`--all`) |
 | `skrybe campaigns create ...` | Create a campaign, optionally sending or scheduling it |
 | `skrybe campaigns send <id> --list <id>` | Send a draft now (`--dry-run` counts recipients, sends nothing) |
 | `skrybe campaigns schedule <id> --at <time> --list <id>` | Schedule a draft, or move a scheduled campaign (`--timezone`, `--dry-run`) |
