@@ -48,6 +48,9 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe campaigns create ...` | Create a campaign, optionally sending or scheduling it |
 | `skrybe emails send ...` | Send or schedule an email to addresses or lists |
 | `skrybe emails send-transactional ...` | Send one email immediately, bypassing the queue |
+| `skrybe autoresponders` | Autoresponders, with how many emails are on (`--list`); read-only |
+| `skrybe autoresponders emails <id>` | An autoresponder's emails, in the order they go out |
+| `skrybe autoresponders stats <email-id>` | Opens, clicks, bounces, complaints and unsubscribes for one email |
 | `skrybe auth login` | Store an API key for an install |
 | `skrybe auth list` | List saved profiles |
 | `skrybe auth logout` | Remove a saved profile |

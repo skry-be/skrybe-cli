@@ -131,6 +131,20 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
     hint: 'A list ID is the encrypted value `skrybe lists` prints, not the integer in the UI URL.',
   },
 
+  // Autoresponders (autoresponders/*.php)
+  'autoresponder id not passed': { code: 'autoresponder_id_missing', exitCode: Exit.USAGE },
+  'autoresponder does not exist': {
+    code: 'autoresponder_not_found',
+    exitCode: Exit.API_ERROR,
+    hint: 'Run `skrybe autoresponders` to see the IDs available to this API key.',
+  },
+  'email id not passed': { code: 'email_id_missing', exitCode: Exit.USAGE },
+  'autoresponder email does not exist': {
+    code: 'autoresponder_email_not_found',
+    exitCode: Exit.API_ERROR,
+    hint: 'Run `skrybe autoresponders emails <autoresponder-id>` to see its emails.',
+  },
+
   // Campaigns (get-campaigns.php, get-campaign.php, stats.php)
   'campaign id not passed': { code: 'campaign_id_missing', exitCode: Exit.USAGE },
   'campaign does not exist': {
