@@ -36,7 +36,8 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe lists` | Subscriber lists for the current brand |
 | `skrybe lists --counts` | ...with active subscriber counts (one request per list) |
 | `skrybe lists count <id>` | Active subscriber count for one list |
-| `skrybe brands` | Brands visible to the current key |
+| `skrybe brands` | Brands visible to the current key (an admin key sees every brand) |
+| `skrybe brands create` | Create a brand — **admin API key only** (see below) |
 | `skrybe whoami` | Show the active profile and its brand |
 | `skrybe subscribers add <email> --list <id>` | Add a subscriber, or update one already on the list |
 | `skrybe subscribers status <email> --list <id>` | Subscribed, Unsubscribed, Bounced, Complained... |
@@ -59,6 +60,26 @@ A bare resource name shows the collection — the common case needs no verb.
 Commands the HTTP API cannot serve yet — `campaigns send`, `lists create` and
 friends — are registered so they fail with an explanation rather than "unknown
 command". The API is gaining them one endpoint at a time.
+
+### Creating a brand (admin key)
+
+```sh
+skrybe brands create --name "Acme" --from-email hello@acme.example
+
+# with a client login; the password is read from stdin, never a flag
+printf '%s' "$PASSWORD" | skrybe brands create --name "Acme" \
+  --from-email hello@acme.example --password-stdin
+
+# a monthly quota that resets on the 1st
+skrybe brands create --name "Acme" --from-email hello@acme.example \
+  --quota custom --monthly-limit 50000 --reset-day 1
+```
+
+The new brand's **API key is printed once** and cannot be read back later. Use
+`--json` to capture it in a script. A brand key gets a 401 from this command
+(exit code 3); only the install admin's key can create brands. SMTP settings
+are flags (`--smtp-host` and friends); the SMTP password is read from
+`SKRYBE_SMTP_PASSWORD`.
 
 ### Passing a body from a file
 

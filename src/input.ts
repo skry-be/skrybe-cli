@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { createInterface } from 'node:readline/promises'
 
 import { UsageError } from './api/errors.js'
 
@@ -59,4 +60,36 @@ export function parseFields(pairs: string[]): Record<string, string> {
     out[pair.slice(0, at)] = pair.slice(at + 1)
   }
   return out
+}
+
+/**
+ * Ask a yes/no question on stderr, defaulting to no. Only call this when stdin
+ * is a TTY: a script has no one to answer, so commands that confirm take
+ * `--yes` instead and refuse without it.
+ */
+export async function confirm(question: string): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stderr })
+  try {
+    return /^y(es)?$/i.test((await rl.question(`${question} [y/N] `)).trim())
+  } finally {
+    rl.close()
+  }
+}
+
+/**
+ * Read one secret from stdin: the whole piped input, or a prompt on a TTY.
+ * Secrets never come from argv, which `ps` and shell history expose.
+ */
+export async function readSecret(label: string): Promise<string> {
+  if (!process.stdin.isTTY) {
+    const chunks: Buffer[] = []
+    for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk))
+    return Buffer.concat(chunks).toString('utf8').replace(/\r?\n$/, '')
+  }
+  const rl = createInterface({ input: process.stdin, output: process.stderr, terminal: true })
+  try {
+    return await rl.question(`${label}: `)
+  } finally {
+    rl.close()
+  }
 }

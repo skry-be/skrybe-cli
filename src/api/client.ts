@@ -201,6 +201,8 @@ function codeForStatus(status: number): string {
       return 'not_found'
     case 405:
       return 'method_not_allowed'
+    case 409:
+      return 'conflict'
     case 429:
       return 'rate_limited'
     default:
