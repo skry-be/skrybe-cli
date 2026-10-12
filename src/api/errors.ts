@@ -131,6 +131,22 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
     hint: 'A list ID is the encrypted value `skrybe lists` prints, not the integer in the UI URL.',
   },
 
+  // Brand transport (admin/brands/set-transport.php)
+  'no brand with that id in this account': { code: 'brand_not_found', exitCode: Exit.API_ERROR },
+  'transport must be relay or ses': { code: 'invalid_transport', exitCode: Exit.USAGE },
+  'smtp_password not passed, and the brand has none stored for this username': {
+    code: 'smtp_password_missing',
+    exitCode: Exit.USAGE,
+    hint: 'Pipe in the password mta-onboard printed with --password-stdin.',
+  },
+  'invalid smtp_username': { code: 'invalid_smtp_username', exitCode: Exit.USAGE },
+  'invalid smtp_host': { code: 'invalid_smtp_host', exitCode: Exit.USAGE },
+  'a campaign of this brand is sending. wait for it to finish, or pass force=1': {
+    code: 'campaign_sending',
+    exitCode: Exit.API_ERROR,
+    hint: 'Switching now sends the rest of that campaign the other way. Wait, or pass --force.',
+  },
+
   // Autoresponders (autoresponders/*.php)
   'autoresponder id not passed': { code: 'autoresponder_id_missing', exitCode: Exit.USAGE },
   'autoresponder does not exist': {
@@ -331,6 +347,28 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
  * by pattern instead. Checked after the exact table.
  */
 const PROSE_PATTERN_ERRORS: [RegExp, ProseRule][] = [
+  // Brand transport: the relay check before a switch. Login first: its server
+  // reply can itself contain " for ".
+  [
+    /^the relay refused the login /,
+    {
+      code: 'relay_login_refused',
+      // Not Exit.AUTH: the client turns that into invalid_api_key, and the
+      // API key was fine; the relay's own credential is what failed.
+      exitCode: Exit.API_ERROR,
+      hint: 'Check the password mta-onboard printed. `mta-onboard --rotate-password` issues a new one.',
+    },
+  ],
+  [
+    /^the relay refused .+ for /,
+    {
+      code: 'relay_sender_refused',
+      exitCode: Exit.API_ERROR,
+      hint: "The brand's From domain is not in the relay's sender map. Run mta-onboard with every domain relay-preflight.php lists.",
+    },
+  ],
+  [/^could not connect to /, { code: 'relay_unreachable', exitCode: Exit.API_ERROR }],
+  [/^tls failed with /, { code: 'relay_tls_failed', exitCode: Exit.API_ERROR }],
   [/^error: this campaign would exceed/, { code: 'quota_exceeded', exitCode: Exit.QUOTA_OR_RATE_LIMIT }],
   [
     /^account under review:/,
