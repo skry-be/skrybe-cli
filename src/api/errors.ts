@@ -141,6 +141,11 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
   },
   'invalid smtp_username': { code: 'invalid_smtp_username', exitCode: Exit.USAGE },
   'invalid smtp_host': { code: 'invalid_smtp_host', exitCode: Exit.USAGE },
+  "relay_environment is not set on this server, so the relay login can't be chosen. set it to production, staging, ...": {
+    code: 'relay_environment_unset',
+    exitCode: Exit.API_ERROR,
+    hint: 'Set RELAY_ENVIRONMENT in the app container (production, staging, …) and redeploy it.',
+  },
   'a campaign of this brand is sending. wait for it to finish, or pass force=1': {
     code: 'campaign_sending',
     exitCode: Exit.API_ERROR,
@@ -368,6 +373,14 @@ const PROSE_PATTERN_ERRORS: [RegExp, ProseRule][] = [
     },
   ],
   [/^could not connect to /, { code: 'relay_unreachable', exitCode: Exit.API_ERROR }],
+  [
+    /^smtp_username does not match this environment/,
+    {
+      code: 'relay_login_mismatch',
+      exitCode: Exit.USAGE,
+      hint: "The relay sends a brand's bounces to the environment its login names. Leave out --username to use this environment's login.",
+    },
+  ],
   [/^tls failed with /, { code: 'relay_tls_failed', exitCode: Exit.API_ERROR }],
   [/^error: this campaign would exceed/, { code: 'quota_exceeded', exitCode: Exit.QUOTA_OR_RATE_LIMIT }],
   [

@@ -83,7 +83,7 @@ export function brandsCommand(getGlobals: () => GlobalOptions): Command {
       new Argument('[transport]', 'relay or ses; leave out to only show the current setting').choices(['relay', 'ses']),
     )
     .option('--password-stdin', 'read the relay password (printed by mta-onboard) from stdin')
-    .addOption(new Option('--username <login>', 'relay login, default brand<brand-id>'))
+    .addOption(new Option('--username <login>', "relay login; default and only accepted value on the relay: brand<brand-id>, plus -<env> outside production"))
     .addOption(new Option('--host <host>', 'relay host, default the server\'s RELAY_SMTP_HOST or mta1.skry.be'))
     .option('--no-verify', 'switch to relay without first logging in to it with the brand\'s From address')
     .option('--force', 'switch even while one of the brand\'s campaigns is sending')

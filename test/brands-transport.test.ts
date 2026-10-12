@@ -66,6 +66,16 @@ describe('brandTransport', () => {
     ],
     ['Could not connect to mta1.skry.be:587: Connection refused 111', Exit.API_ERROR, 'relay_unreachable'],
     ['TLS failed with mta1.skry.be: certificate verify failed', Exit.API_ERROR, 'relay_tls_failed'],
+    [
+      "RELAY_ENVIRONMENT is not set on this server, so the relay login can't be chosen. Set it to production, staging, ...",
+      Exit.API_ERROR,
+      'relay_environment_unset',
+    ],
+    [
+      'smtp_username does not match this environment: the relay login for this brand here is brand86-staging',
+      Exit.USAGE,
+      'relay_login_mismatch',
+    ],
   ]
   for (const [body, exitCode, code] of cases) {
     it(`maps "${body}"`, async () => {
