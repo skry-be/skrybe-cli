@@ -45,6 +45,7 @@ A bare resource name shows the collection — the common case needs no verb.
 | `skrybe lists fields delete <id> <name>` | Delete a field and its values (asks first; `--yes` in scripts) |
 | `skrybe lists delete <id>` | Delete a list and its subscribers (asks first; `--yes` in scripts) |
 | `skrybe brands` | Brands visible to the current key |
+| `skrybe brands transport <id> [relay\|ses]` | Show, or switch, whether a brand sends through the relay or SES (`--password-stdin`; checks the relay accepts the login and From domain first unless `--no-verify`; refuses mid-send unless `--force`; main account key only) |
 | `skrybe whoami` | Show the active profile and its brand |
 | `skrybe subscribers ls --list <id>` | A list's subscribers, oldest first (`--status`, `--page`, `--limit`, `--all`) |
 | `skrybe subscribers add <email> --list <id>` | Add a subscriber, or update one already on the list |
