@@ -45,6 +45,8 @@ deployed; the API side lives in skry-be/skrybe-dashboard.
 - `subscribers add --field 'Two words=…'` now sets fields whose names contain
   spaces.
 - `campaigns get` shows a scheduled time in the campaign's own timezone.
+- `lists ls --counts` and `lists ls --include-hidden` now take effect; the
+  flags were being read by `lists` instead of `ls`.
 
 ## [0.1.0] - 2026-09-09
 
