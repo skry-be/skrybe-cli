@@ -27,6 +27,15 @@ deployed; the API side lives in skry-be/skrybe-dashboard.
 - `templates`, `templates get|create|update|delete`.
 - `autoresponders`, `autoresponders emails <id>` and `autoresponders stats
   <email-id>` (read-only).
+- `brands transport <id> [relay|ses]`: show, or switch, whether a brand sends
+  through the relay or SES. Checks the relay accepts the login and From domain
+  first (`--no-verify` to skip), refuses mid-send unless `--force`, and reads
+  the relay password with `--password-stdin`. Needs the main account key.
+
+### Changed
+- The URL defaults to `https://dashboard.skry.be`, so `skrybe auth login` no
+  longer needs `--url`. `--url`, `SKRYBE_API_URL` and a saved profile still
+  take precedence, and `auth login` now honours `SKRYBE_API_URL` too.
 
 ### Fixed
 - Piping output into a reader that stops early (`skrybe lists | head`) no
