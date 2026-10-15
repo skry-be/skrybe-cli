@@ -7,6 +7,7 @@ import { UsageError } from '../api/errors.js'
 import { listBrands } from '../api/resources/brands.js'
 import {
   configPath,
+  DEFAULT_URL,
   deleteProfile,
   normaliseUrl,
   readConfig,
@@ -49,14 +50,8 @@ export function authCommand(getGlobals: () => GlobalOptions): Command {
     .option('--no-verify', 'Skip checking the key against the API before saving')
     .action(async (options: { verify: boolean }) => {
       const globals = getGlobals()
-      if (!globals.url) {
-        throw new UsageError(
-          'A Skrybe URL is required to log in.',
-          'skrybe auth login --url https://your-install.example.com',
-        )
-      }
       const profileName = globals.profile ?? 'default'
-      const url = normaliseUrl(globals.url)
+      const url = normaliseUrl(globals.url || process.env.SKRYBE_API_URL?.trim() || DEFAULT_URL)
       const apiKey = process.env.SKRYBE_API_KEY?.trim() || (await promptForKey())
 
       if (apiKey === '') {

@@ -16,6 +16,9 @@ export interface ConfigFile {
   profiles: Record<string, Profile>
 }
 
+/** The hosted Skrybe dashboard. Used when nothing else names a URL. */
+export const DEFAULT_URL = 'https://dashboard.skry.be'
+
 const EMPTY: ConfigFile = { currentProfile: 'default', profiles: {} }
 
 export function configPath(): string {
@@ -66,8 +69,8 @@ export interface ResolvedProfile extends Profile {
  *   3. SKRYBE_PROFILE
  *   4. currentProfile from the config file
  *
- * `--url` may override the resolved URL on its own, which is what lets
- * `auth login --url ...` work before any profile exists.
+ * `--url` may override the resolved URL on its own. With no URL anywhere, the
+ * hosted dashboard (DEFAULT_URL) is used.
  *
  * There is deliberately no `--api-key` flag: argv is visible in `ps` and lands
  * in shell history.
@@ -82,7 +85,7 @@ export function resolveProfile(opts: ResolveOptions = {}): ResolvedProfile {
   const stored = config.profiles[name]
 
   const apiKey = envKey || stored?.apiKey
-  const url = opts.url ?? envUrl ?? stored?.url
+  const url = opts.url ?? (envUrl || undefined) ?? stored?.url ?? DEFAULT_URL
 
   if (!apiKey) {
     if (requested && !stored) {
@@ -96,13 +99,6 @@ export function resolveProfile(opts: ResolveOptions = {}): ResolvedProfile {
       'Run `skrybe auth login`, or set SKRYBE_API_KEY and SKRYBE_API_URL.',
     )
   }
-  if (!url) {
-    throw new UsageError(
-      'No Skrybe URL configured.',
-      'Pass --url https://your-install.example.com, or set SKRYBE_API_URL.',
-    )
-  }
-
   return { name: envKey && !stored ? null : name, url: normaliseUrl(url), apiKey }
 }
 
@@ -111,7 +107,7 @@ export function normaliseUrl(url: string): string {
   if (!/^https?:\/\//i.test(trimmed)) {
     throw new UsageError(
       `"${url}" is not a valid URL.`,
-      'Include the scheme, e.g. https://app.example.com',
+      'Include the scheme, e.g. https://dashboard.skry.be',
     )
   }
   return trimmed
