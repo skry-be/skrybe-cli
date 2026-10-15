@@ -9,6 +9,8 @@ deployed; the API side lives in skry-be/skrybe-dashboard.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-15
+
 ### Added
 - `campaigns ls`/bare `campaigns`, `campaigns get` and `campaigns stats`: read
   campaigns, their details and their stats.
