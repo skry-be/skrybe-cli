@@ -21,7 +21,7 @@ The API key is the whole credential — there is no separate login. Generate one
 in the Skrybe UI under **Settings**, then:
 
 ```bash
-skrybe auth login --url https://your-install.example.com
+skrybe auth login
 # API key: (paste it here — it is read from stdin, never from a flag)
 
 skrybe lists
@@ -194,7 +194,7 @@ re-running a script is not a failure. `--json` reports which happened:
 One API key maps to exactly one brand, so a profile per brand is the natural unit:
 
 ```bash
-skrybe auth login --url https://app.example.com --profile acme
+skrybe auth login --profile acme
 skrybe --profile acme lists
 ```
 
@@ -209,6 +209,9 @@ Resolution order, highest first:
 4. the current profile in the config file
 
 Env wins so CI needs no config file on disk.
+
+The URL defaults to `https://dashboard.skry.be`. Pass `--url` (or set
+`SKRYBE_API_URL`) only to point at another Skrybe install.
 
 ## Scripting
 

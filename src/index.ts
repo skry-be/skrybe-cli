@@ -14,6 +14,7 @@ import { statsCommand } from './commands/stats.js'
 import { subscribersCommand } from './commands/subscribers.js'
 import { templatesCommand } from './commands/templates.js'
 import { registerStubs } from './commands/unimplemented.js'
+import { DEFAULT_URL } from './config.js'
 import { bold, dim, red, resolveFormat, type OutputFormat } from './output.js'
 import { version } from './version.js'
 
@@ -25,7 +26,7 @@ program
   .description('Command line interface for the Skrybe email marketing API')
   .version(version(), '-v, --version')
   .option('--profile <name>', 'Credential profile to use (default: the current profile)')
-  .option('--url <url>', 'Override the Skrybe base URL for this invocation')
+  .option('--url <url>', `Override the Skrybe base URL for this invocation (default: ${DEFAULT_URL})`)
   .option('--output <format>', 'Output format: table (default), json or text')
   .option('--json', 'Shorthand for --output json')
   .addHelpText(
@@ -44,7 +45,7 @@ ${bold('Credentials')}
   Resolution order: SKRYBE_API_KEY / SKRYBE_API_URL, then --profile,
   then SKRYBE_PROFILE, then the current profile in the config file.
 
-  Get started with:  skrybe auth login --url https://your-install.example.com
+  Get started with:  skrybe auth login
 
 ${dim('The API key is read from stdin, never from a flag — argv is visible in `ps`.')}
 `,
