@@ -11,6 +11,8 @@ import { SkrybeClient } from '../src/api/client.js'
 import { ApiError, Exit } from '../src/api/errors.js'
 import {
   autoresponderEmailStats,
+  createAutoresponder,
+  createAutoresponderEmail,
   getAutoresponder,
   listAutoresponders,
   type Autoresponder,
@@ -71,10 +73,43 @@ describe('autoresponders', () => {
     assert.equal(stub.received[1]?.fields.email_id, '15')
   })
 
+  it('createAutoresponder posts the list, type and date field', async () => {
+    const created = ares({ id: 34, type: 'annually', custom_field: 'Birthday', emails: 0, enabled_emails: 0 })
+    const stub = await startStub([{ body: JSON.stringify(created) }])
+    const client = new SkrybeClient({ url: stub.url, apiKey: KEY })
+
+    const a = await createAutoresponder(client, { name: 'Birthday wishes', listId: 'L', type: 'annually', customField: 'Birthday' })
+
+    assert.equal(a.id, 34)
+    assert.equal(stub.received[0]?.path, '/api/autoresponders/create-autoresponder.php')
+    assert.deepEqual(
+      [stub.received[0]?.fields.name, stub.received[0]?.fields.list_id, stub.received[0]?.fields.type, stub.received[0]?.fields.custom_field],
+      ['Birthday wishes', 'L', 'annually', 'Birthday'],
+    )
+  })
+
+  it('createAutoresponderEmail sends enabled only when asked, and keeps "+" intact', async () => {
+    const email = { ...withEmails.email_list[1]!, id: 89, autoresponder_id: 34, when: '+9 hours' }
+    const stub = await startStub([{ body: JSON.stringify(email) }, { body: JSON.stringify(email) }])
+    const client = new SkrybeClient({ url: stub.url, apiKey: KEY })
+
+    await createAutoresponderEmail(client, 34, { subject: 'Happy birthday', htmlText: '<p>Hi</p>', when: '+9 hours' })
+    await createAutoresponderEmail(client, 34, { subject: 'Happy birthday', htmlText: '<p>Hi</p>', enabled: true })
+
+    assert.equal(stub.received[0]?.path, '/api/autoresponders/create-autoresponder-email.php')
+    assert.equal(stub.received[0]?.fields.autoresponder_id, '34')
+    assert.equal(stub.received[0]?.fields.when, '+9 hours')
+    assert.equal(stub.received[0]?.fields.enabled, undefined)
+    assert.equal(stub.received[1]?.fields.enabled, '1')
+  })
+
   for (const [body, code] of [
     ['Autoresponder does not exist', 'autoresponder_not_found'],
     ['Autoresponder email does not exist', 'autoresponder_email_not_found'],
     ['Autoresponder ID not passed', 'autoresponder_id_missing'],
+    ['Field already has an autoresponder', 'autoresponder_exists'],
+    ['Field is not a date field', 'field_not_date'],
+    ['when must be on, or an offset such as +9 hours or -1 days', 'invalid_when'],
   ] as const) {
     it(`maps "${body}" to ${code}`, async () => {
       const stub = await startStub([{ body }])
@@ -128,6 +163,36 @@ describe('skrybe autoresponders (CLI)', () => {
     const { stdout } = await run(stub.url, 'autoresponders', 'stats', '15', '--json')
 
     assert.deepEqual(JSON.parse(stdout), stats)
+  })
+
+  it('create prints the new id, reading --list past the parent option', async () => {
+    const stub = await startStub([{ body: JSON.stringify(ares({ id: 34, type: 'annually', custom_field: 'Birthday' })) }])
+
+    const { stdout } = await run(stub.url, 'autoresponders', 'create', 'Birthday wishes', '--list', 'L', '--type', 'annually', '--field', 'Birthday')
+
+    assert.equal(stdout.trim(), '34')
+    assert.equal(stub.received[0]?.fields.list_id, 'L')
+    assert.equal(stub.received[0]?.fields.custom_field, 'Birthday')
+  })
+
+  it('create refuses a dated type without --field, before any request', async () => {
+    const stub = await startStub([{ body: '{}' }])
+
+    await assert.rejects(run(stub.url, 'autoresponders', 'create', 'B', '--list', 'L', '--type', 'annually'), (err: { code?: number }) => {
+      assert.equal(err.code, Exit.USAGE)
+      return true
+    })
+    assert.equal(stub.received.length, 0)
+  })
+
+  it('add-email --json prints the email', async () => {
+    const email = { ...withEmails.email_list[0]!, id: 89, autoresponder_id: 34, when: '+9 hours', enabled: false }
+    const stub = await startStub([{ body: JSON.stringify(email) }])
+
+    const { stdout } = await run(stub.url, 'ares', 'add-email', '34', '--subject', 'Happy birthday', '--html-text', '<p>Hi</p>', '--when', '+9 hours', '--json')
+
+    assert.deepEqual(JSON.parse(stdout), email)
+    assert.equal(stub.received[0]?.fields.subject, 'Happy birthday')
   })
 
   it('rejects a non-numeric id before any request', async () => {

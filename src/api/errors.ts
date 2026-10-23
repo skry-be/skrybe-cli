@@ -165,6 +165,30 @@ const PROSE_ERRORS: Record<string, ProseRule> = {
     exitCode: Exit.API_ERROR,
     hint: 'Run `skrybe autoresponders emails <autoresponder-id>` to see its emails.',
   },
+  'autoresponder name not passed': { code: 'autoresponder_name_missing', exitCode: Exit.USAGE },
+  'type must be drip, annually or on_date': { code: 'invalid_autoresponder_type', exitCode: Exit.USAGE },
+  'custom_field not passed': {
+    code: 'custom_field_missing',
+    exitCode: Exit.USAGE,
+    hint: 'An annually or on_date autoresponder needs --field, the list\'s date field it sends on.',
+  },
+  'field is not a date field': {
+    code: 'field_not_date',
+    exitCode: Exit.USAGE,
+    hint: 'Run `skrybe lists fields <list-id>` to see which fields are dates.',
+  },
+  'field already has an autoresponder': {
+    code: 'autoresponder_exists',
+    exitCode: Exit.API_ERROR,
+    hint: 'A date field can drive one autoresponder. Add emails to that one with `skrybe autoresponders add-email`.',
+  },
+  'list already has a drip autoresponder': {
+    code: 'autoresponder_exists',
+    exitCode: Exit.API_ERROR,
+    hint: 'A list has one drip. Add emails to it with `skrybe autoresponders add-email`.',
+  },
+  'subject not passed': { code: 'subject_missing', exitCode: Exit.USAGE },
+  'a drip email cannot go before signup': { code: 'invalid_when', exitCode: Exit.USAGE },
 
   // Templates (templates/*.php)
   'template id not passed': { code: 'template_id_missing', exitCode: Exit.USAGE },
@@ -392,6 +416,14 @@ const PROSE_PATTERN_ERRORS: [RegExp, ProseRule][] = [
     },
   ],
   [/^a field is too long/, { code: 'field_too_long', exitCode: Exit.USAGE }],
+  [
+    /^when must be /,
+    {
+      code: 'invalid_when',
+      exitCode: Exit.USAGE,
+      hint: 'e.g. immediately or "+3 days" for a drip; on, "+9 hours" or "-1 days" for a dated autoresponder.',
+    },
+  ],
   [
     /^brand is under review/,
     {

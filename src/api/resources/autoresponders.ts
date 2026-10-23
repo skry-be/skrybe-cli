@@ -80,3 +80,60 @@ export async function autoresponderEmailStats(client: SkrybeClient, emailId: num
   })
   return parseJsonObject<AutoresponderEmailStats>(body, 'autoresponder email stats')
 }
+
+/** `customField` is the list's Date field an `annually` or `on_date` one sends on. */
+export interface NewAutoresponder {
+  name: string
+  listId: string
+  type: Exclude<AutoresponderType, 'unknown'>
+  customField?: string
+}
+
+/** Starts with no emails. Not retried: a repeat would create a second one. */
+export async function createAutoresponder(client: SkrybeClient, input: NewAutoresponder): Promise<Autoresponder> {
+  const text = await client.requestText({
+    path: 'api/autoresponders/create-autoresponder.php',
+    body: { name: input.name, list_id: input.listId, type: input.type, custom_field: input.customField },
+  })
+  return parseJsonObject<Autoresponder>(text, 'autoresponder')
+}
+
+/**
+ * `when`: "immediately" or "+3 days" for a drip; "on", "+9 hours" or "-1 days"
+ * for a dated one. The sender defaults to the brand's. Created off unless `enabled`.
+ */
+export interface NewAutoresponderEmail {
+  subject: string
+  htmlText: string
+  plainText?: string
+  preheader?: string
+  when?: string
+  fromName?: string
+  fromEmail?: string
+  replyTo?: string
+  enabled?: boolean
+}
+
+/** Not retried: a repeat would add the email twice. */
+export async function createAutoresponderEmail(
+  client: SkrybeClient,
+  autoresponderId: number,
+  input: NewAutoresponderEmail,
+): Promise<AutoresponderEmail> {
+  const text = await client.requestText({
+    path: 'api/autoresponders/create-autoresponder-email.php',
+    body: {
+      autoresponder_id: autoresponderId,
+      subject: input.subject,
+      html_text: input.htmlText,
+      plain_text: input.plainText,
+      preheader: input.preheader,
+      when: input.when,
+      from_name: input.fromName,
+      from_email: input.fromEmail,
+      reply_to: input.replyTo,
+      enabled: input.enabled ? 1 : undefined,
+    },
+  })
+  return parseJsonObject<AutoresponderEmail>(text, 'autoresponder email')
+}

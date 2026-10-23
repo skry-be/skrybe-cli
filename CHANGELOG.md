@@ -9,6 +9,15 @@ deployed; the API side lives in skry-be/skrybe-dashboard.
 
 ## [Unreleased]
 
+### Added
+- `autoresponders create <name> --list <id> [--type drip|annually|on_date]
+  [--field <date-field>]`: create an autoresponder, e.g. a yearly birthday
+  email on a `Birthday` field.
+- `autoresponders add-email <id> --subject … --html-text … [--when …]`: add an
+  email to one. `--when` is `immediately` or `+3 days` for a drip, and `on`,
+  `+9 hours` or `-1 days` for a dated one. Emails are created off unless
+  `--enable`, so an agent can draft one for a person to turn on.
+
 ## [0.2.0] - 2026-10-15
 
 ### Added
