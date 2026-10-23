@@ -9,6 +9,8 @@ deployed; the API side lives in skry-be/skrybe-dashboard.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-23
+
 ### Added
 - `autoresponders create <name> --list <id> [--type drip|annually|on_date]
   [--field <date-field>]`: create an autoresponder, e.g. a yearly birthday
